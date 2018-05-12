@@ -4,7 +4,6 @@
 #include <ws2tcpip.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <time.h>
 
 #include "server.h"
 
@@ -146,9 +145,8 @@ void server_run(struct server *server) {
         FD_ZERO(&read_set);
         FD_SET(server->listen_sock, &read_set);
 
-        // Don't block
-        struct timeval timeout;
-        timerclear(&timeout);
+        // Don't block (for very long)
+        struct timeval timeout = {.tv_sec=0, .tv_usec=1};
 
         // Check if a new connection is available
         if (select(FD_SETSIZE, &read_set, NULL, NULL, &timeout)) {
