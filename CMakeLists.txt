@@ -4,4 +4,4 @@ project(ssb C)
 set(CMAKE_C_STANDARD 99)
 
 link_libraries(ws2_32 wsock32)
-add_executable(ssb main.c)
+add_executable(ssb main.c server.c server.h session.c session.h)
