@@ -10,6 +10,7 @@ void state_init(struct session *sess) {
                          "(commit " GIT_COMMIT_HASH " from " GIT_COMMIT_TIMESTAMP ")\n\r");
 
     terminal_clear(sess);
+    terminal_reset(sess);
     terminal_cursor(sess, false);
 
     sess->state.screen = title_screen;
@@ -18,7 +19,14 @@ void state_init(struct session *sess) {
 
 static bool title_screen_update(struct session *sess) {
     terminal_move(sess, 0, 0);
-    terminal_write(sess, "hello\n\rworld\n\r");
+    terminal_rect(sess, 0, 0, 80, 25, '#');
+    //terminal_write(sess,);
+
+    terminal_move(sess, 25, 11);
+    terminal_write(sess, "hello, ");
+    terminal_inverse(sess, true);
+    terminal_write(sess, "world!");
+    terminal_inverse(sess, false);
 
     return true;
 }
