@@ -27,4 +27,4 @@ add_definitions(-DGIT_COMMIT_TIMESTAMP="${GIT_COMMIT_TIMESTAMP}")
 # Link Winsock libraries
 link_libraries(ws2_32 wsock32)
 
-add_executable(ssb main.c server.c server.h session.c session.h state.c state.h terminal.c terminal.h)
+add_executable(ssb main.c server.c server.h session.c session.h state.c state.h terminal.c terminal.h config.h)

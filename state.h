@@ -6,18 +6,16 @@
 #include "terminal.h"
 
 enum screen {
-    title_screen,
-    playing_screen,
-    pause_screen
+    title_screen
 };
 
 struct state {
     enum screen screen;
-
-    enum parse_state parse_state;
 };
 
 struct session;
+
+void state_init(struct session *sess);
 
 bool state_update(struct session *sess);
 

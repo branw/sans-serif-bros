@@ -86,7 +86,7 @@ void server_accept_session(struct server *server) {
 
     // If there are too many concurrent sessions, disconnect this one
     if (server->num_sessions >= MAX_SESSIONS) {
-        fprintf(stderr, "max sessions reached\n");
+        fprintf(stderr, "max sessions reached (%d)\n", MAX_SESSIONS);
         terminal_write(sess, "Too many users are on at the moment; try again later!\n\r");
         session_shutdown(sess);
         free(sess);
