@@ -3,17 +3,19 @@
 
 #include <Winsock2.h>
 #include <stdbool.h>
-#include <time.h>
+
+#include "state.h"
 
 struct session {
     SOCKET client_sock;
-    struct timespec last_tick;
+    struct state state;
 
+    int id;
     struct session *prev;
     struct session *next;
 };
 
-bool session_create(struct session *session, SOCKET client_sock);
+bool session_create(struct session *sess, SOCKET client_sock);
 
 void session_shutdown(struct session *sess);
 

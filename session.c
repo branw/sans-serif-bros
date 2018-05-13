@@ -5,9 +5,8 @@
 
 #include "session.h"
 
-bool session_create(struct session *session, SOCKET client_sock) {
-    session->client_sock = client_sock;
-    session->last_tick.tv_sec = session->last_tick.tv_nsec = 0;
+bool session_create(struct session *sess, SOCKET client_sock) {
+    sess->client_sock = client_sock;
 
     SOCKADDR_IN info = {0};
     int info_size = sizeof(info);
@@ -16,7 +15,7 @@ bool session_create(struct session *session, SOCKET client_sock) {
     char ip[16];
     inet_ntop(AF_INET, &info.sin_addr, ip, 16);
 
-    printf("Client %s connected\n", ip);
+    printf("#%d connected (%s)\n", sess->id, ip);
 
     u_long mode = 1;
     ioctlsocket(client_sock, FIONBIO, &mode);
@@ -25,17 +24,15 @@ bool session_create(struct session *session, SOCKET client_sock) {
     send(client_sock, (const char *) will_echo, 3, 0);
     unsigned char will_sga[] = {0xff, 0xfb, 0x03};
     send(client_sock, (const char *) will_sga, 3, 0);
+    unsigned char do_naws[] = {0xff, 253, 31};
+    send(client_sock, (const char *) do_naws, 3, 0);
+
+    terminal_write(sess, "Super Serif Bros. Telnet Edition\n\r"
+                         "(commit " GIT_COMMIT_HASH " from " GIT_COMMIT_TIMESTAMP ")\n\r");
 }
 
 void session_shutdown(struct session *sess) {
-    SOCKADDR_IN info = {0};
-    int info_size = sizeof(info);
-    getpeername(sess->client_sock, (struct sockaddr *) &info, &info_size);
-
-    char ip[16];
-    inet_ntop(AF_INET, &info.sin_addr, ip, 16);
-
-    printf("Client %s disconnected\n", ip);
+    printf("#%d disconnected\n", sess->id);
 
     int res = shutdown(sess->client_sock, SD_SEND);
     if (res == SOCKET_ERROR) {
@@ -47,10 +44,10 @@ void session_shutdown(struct session *sess) {
 
 #define RECV_BUF_LEN 512
 
-bool session_update(struct session *sess) {
+static bool update_input(struct session *sess) {
     char recv_buf[RECV_BUF_LEN];
 
-    // Receive a block from the client
+    // Receive a packet from the client
     int recv_len = recv(sess->client_sock, recv_buf, RECV_BUF_LEN, 0);
     if (recv_len == SOCKET_ERROR) {
         int err = WSAGetLastError();
@@ -70,10 +67,17 @@ bool session_update(struct session *sess) {
         return false;
     }
 
+    printf("#%d: ", sess->id);
     for (int i = 0; i < recv_len; ++i) {
-        printf("%02x ", (unsigned char) (recv_buf[i]));
+        printf("%02x ", (unsigned char) recv_buf[i]);
     }
     printf("\n");
 
+    terminal_parse(sess, recv_buf, recv_len);
+
     return true;
+}
+
+bool session_update(struct session *sess) {
+    return update_input(sess) && state_update(sess);
 }

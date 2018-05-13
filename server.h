@@ -7,6 +7,7 @@ struct server {
     SOCKET listen_sock;
     struct session *sessions;
     int num_sessions;
+    int total_sessions;
 };
 
 bool server_create(struct server *server);

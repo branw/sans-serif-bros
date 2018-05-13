@@ -65,7 +65,7 @@ bool server_create(struct server *server) {
 
     server->listen_sock = sock;
     server->sessions = NULL;
-    server->num_sessions = 0;
+    server->num_sessions = server->total_sessions = 0;
 
     return true;
 }
@@ -81,11 +81,13 @@ void server_accept_session(struct server *server) {
     }
 
     struct session *sess = malloc(sizeof(*sess));
+    sess->id = server->total_sessions++;
     session_create(sess, sock);
 
-    // There are too many concurrent sessions
+    // If there are too many concurrent sessions, disconnect this one
     if (server->num_sessions >= MAX_SESSIONS) {
         fprintf(stderr, "max sessions reached\n");
+        terminal_write(sess, "Too many users are on at the moment; try again later!\n\r");
         session_shutdown(sess);
         free(sess);
         return;
