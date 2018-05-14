@@ -6,8 +6,7 @@
 #include <stdbool.h>
 
 #include "server.h"
-
-#define MAX_SESSIONS 2
+#include "config.h"
 
 bool server_create(struct server *server) {
     // Initialize WSA

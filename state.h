@@ -5,24 +5,22 @@
 #include <time.h>
 
 #include "terminal.h"
+#include "game.h"
 
 // Duration in ms between updates
-#define TICK_DURATION 125
-
-// Number of bytes to store for each session; must be a power of 2
-#define INPUT_BUF_LEN 512
+#define TICK_DURATION 100
 
 enum screen {
-    title_screen
+    title_screen, game_screen
 };
 
 struct state {
+    struct timespec last_tick;
     enum screen screen;
 
-    struct timespec last_tick;
+    struct terminal_state terminal_state;
 
-    char input_buf[INPUT_BUF_LEN];
-    unsigned input_buf_read, input_buf_write;
+    struct game_state game_state;
 };
 
 struct session;

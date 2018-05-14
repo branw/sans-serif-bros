@@ -1,67 +1,27 @@
 #include <stdio.h>
 #include "state.h"
 #include "session.h"
+#include "config.h"
 
 void state_init(struct session *sess) {
+    // Initialize the states
+    sess->state.last_tick.tv_sec = sess->state.last_tick.tv_nsec = 0;
+    sess->state.screen = game_screen;
+    terminal_init(&sess->state.terminal_state);
+    game_init(&sess->state.game_state);
+
+    // Negotiate Telnet configuration
     terminal_send(sess, IAC WILL ECHO, 3);
     terminal_send(sess, IAC DONT ECHO, 3);
     terminal_send(sess, IAC WILL SUPPRESS_GO_AHEAD, 3);
 
-    terminal_write(sess, "Super Serif Bros. Telnet Edition\n\r"
-                         "(commit " GIT_COMMIT_HASH " from " GIT_COMMIT_TIMESTAMP ")\n\r");
+    // Leave a greeting to describe the game version
+    terminal_write(sess, WELCOME_MESSAGE);
 
+    // Empty the terminal and hide the cursor
     terminal_clear(sess);
     terminal_reset(sess);
     terminal_cursor(sess, false);
-
-    sess->state.screen = title_screen;
-    clock_gettime(CLOCK_MONOTONIC, &sess->state.last_tick);
-    sess->state.input_buf_read = sess->state.input_buf_write = 0;
-}
-
-struct menu_input {
-    bool esc, enter, space;
-    int x, y;
-};
-
-static void parse_menu_input(struct session *sess, struct menu_input *input) {
-    input->esc = input->enter = input->space = false;
-    input->x = input->y = 0;
-
-    int available;
-    while ((available = terminal_available(sess)) > 0) {
-        char val0 = terminal_read(sess), val1 = terminal_peek(sess, 0),
-                val2 = terminal_peek(sess, 1);
-        switch (available) {
-        default:
-        case 3:
-            if (val0 == '\x1b' && val1 == '[' && val2 == 'A') {
-                input->y = 1;
-            }
-            if (val0 == '\x1b' && val1 == '[' && val2 == 'B') {
-                input->y = -1;
-            }
-            if (val0 == '\x1b' && val1 == '[' && val2 == 'C') {
-                input->x = 1;
-            }
-            if (val0 == '\x1b' && val1 == '[' && val2 == 'D') {
-                input->x = -1;
-            }
-
-        case 2:
-            if (val0 == '\x0d' && (val1 == '\x00' || val1 == '\x0a')) {
-                input->enter = true;
-            }
-
-        case 1:
-            if (val0 == '\x1b' && available == 1) {
-                input->esc = true;
-            }
-            if (val0 == '\x20') {
-                input->space = true;
-            }
-        }
-    }
 }
 
 static bool title_screen_update(struct session *sess) {
@@ -70,7 +30,7 @@ static bool title_screen_update(struct session *sess) {
 
     // Parse input buffer
     struct menu_input input;
-    parse_menu_input(sess, &input);
+    terminal_read_menu_input(sess, &input);
 
     if (input.esc) {
         return false;
@@ -91,6 +51,28 @@ static bool title_screen_update(struct session *sess) {
     terminal_write(sess, "@");
 
     terminal_inverse(sess, false);
+
+    //sess->state.screen = game_screen;
+
+    return true;
+}
+
+static bool game_screen_update(struct session *sess) {
+    terminal_read_menu_input(sess, &sess->state.game_state.input);
+    game_update(&sess->state.game_state);
+
+    terminal_reset(sess);
+
+    if (sess->state.game_state.win) {
+        terminal_write(sess, "\x1b[42m");
+    } else if (sess->state.game_state.die) {
+        terminal_write(sess, "\x1b[41m");
+    }
+
+    for (unsigned row = 0; row < 25; ++row) {
+        terminal_move(sess, 0, row);
+        terminal_send(sess, sess->state.game_state.field[row], 80);
+    }
 
     return true;
 }
@@ -115,5 +97,8 @@ bool state_update(struct session *sess) {
     default:
     case title_screen:
         return title_screen_update(sess);
+
+    case game_screen:
+        return game_screen_update(sess);
     }
 }

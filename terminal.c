@@ -29,36 +29,41 @@ void terminal_recv(struct session *sess, char *buf, int len) {
     terminal_parse(sess, buf, len);
 }
 
-#define INPUT_BUF_MASK(val) ((val) & (INPUT_BUF_LEN - 1))
+#define STATE sess->state.terminal_state
 
-#define INPUT_BUF_SIZE(state) ((state).input_buf_write - (state).input_buf_read)
-#define INPUT_BUF_EMPTY(state) ((state).input_buf_read == (state).input_buf_write)
-#define INPUT_BUF_FULL(state) (INPUT_BUF_SIZE(state) == INPUT_BUF_LEN)
+#define INPUT_BUF STATE.input_buf
+#define INPUT_BUF_READ STATE.input_buf_read
+#define INPUT_BUF_WRITE STATE.input_buf_write
+
+#define INPUT_BUF_MASK(val) ((val) & (INPUT_BUF_LEN - 1))
+#define INPUT_BUF_SIZE (STATE.input_buf_write - STATE.input_buf_read)
+#define INPUT_BUF_EMPTY (STATE.input_buf_read == STATE.input_buf_write)
+#define INPUT_BUF_FULL (INPUT_BUF_SIZE == INPUT_BUF_LEN)
 
 void terminal_parse(struct session *sess, char *buf, int len) {
     // Check if there's room in the input buffer, otherwise we're discarding the incoming data!
-    if ((sess->state.input_buf_write - sess->state.input_buf_read) == INPUT_BUF_LEN) {
+    if (INPUT_BUF_FULL) {
         fprintf(stderr, "%d: input buffer full\n", sess->id);
         return;
     }
 
     // Naively feed data to the input buffer
     //TODO don't do this
-    for (int i = 0; i < len && !INPUT_BUF_FULL(sess->state); ++i) {
-        sess->state.input_buf[INPUT_BUF_MASK(sess->state.input_buf_write++)] = buf[i];
+    for (int i = 0; i < len && !INPUT_BUF_FULL; ++i) {
+        INPUT_BUF[INPUT_BUF_MASK(INPUT_BUF_WRITE++)] = buf[i];
     }
 }
 
 unsigned terminal_available(struct session *sess) {
-    return INPUT_BUF_SIZE(sess->state);
+    return INPUT_BUF_SIZE;
 }
 
 char terminal_read(struct session *sess) {
-    return sess->state.input_buf[INPUT_BUF_MASK(sess->state.input_buf_read++)];
+    return INPUT_BUF[INPUT_BUF_MASK(INPUT_BUF_READ++)];
 }
 
 char terminal_peek(struct session *sess, unsigned n) {
-    return sess->state.input_buf[INPUT_BUF_MASK(sess->state.input_buf_read + n)];
+    return INPUT_BUF[INPUT_BUF_MASK(INPUT_BUF_READ + n)];
 }
 
 void terminal_write(struct session *sess, char *buf) {
@@ -75,14 +80,11 @@ void terminal_move(struct session *sess, unsigned x, unsigned y) {
 }
 
 void terminal_clear(struct session *sess) {
-    char buf[] = CSI "2J";
-    terminal_send(sess, buf, 4);
+    terminal_write(sess, CSI "2J");
 }
 
 void terminal_cursor(struct session *sess, bool state) {
-    char buf[10];
-    int len = snprintf(buf, 10, CSI "?25%c", (state ? 'h' : 'l'));
-    terminal_send(sess, buf, len);
+    terminal_write(sess, state ? CSI "?25h" : CSI "?25l");
 }
 
 void terminal_rect(struct session *sess, unsigned x, unsigned y, unsigned w, unsigned h,
@@ -123,4 +125,48 @@ void terminal_underline(struct session *sess, bool state) {
 
 void terminal_inverse(struct session *sess, bool state) {
     terminal_write(sess, state ? CSI "7m" : CSI "27m");
+}
+
+void terminal_init(struct terminal_state *state) {
+    state->input_buf_read = state->input_buf_write = 0;
+}
+
+void terminal_read_menu_input(struct session *sess, struct menu_input *input) {
+    input->esc = input->enter = input->space = false;
+    input->x = input->y = 0;
+
+    int available;
+    while ((available = terminal_available(sess)) > 0) {
+        char val0 = terminal_read(sess), val1 = terminal_peek(sess, 0),
+                val2 = terminal_peek(sess, 1);
+        switch (available) {
+        default:
+        case 3:
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'A') {
+                input->y = 1;
+            }
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'B') {
+                input->y = -1;
+            }
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'C') {
+                input->x = 1;
+            }
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'D') {
+                input->x = -1;
+            }
+
+        case 2:
+            if (val0 == '\x0d' && (val1 == '\x00' || val1 == '\x0a')) {
+                input->enter = true;
+            }
+
+        case 1:
+            if (val0 == '\x1b' && available == 1) {
+                input->esc = true;
+            }
+            if (val0 == '\x20') {
+                input->space = true;
+            }
+        }
+    }
 }

@@ -60,4 +60,21 @@ void terminal_underline(struct session *sess, bool state);
 
 void terminal_inverse(struct session *sess, bool state);
 
+// Number of bytes to store for each session; must be a power of 2
+#define INPUT_BUF_LEN 512
+
+struct terminal_state {
+    char input_buf[INPUT_BUF_LEN];
+    unsigned input_buf_read, input_buf_write;
+};
+
+void terminal_init(struct terminal_state *state);
+
+struct menu_input {
+    bool esc, enter, space;
+    int x, y;
+};
+
+void terminal_read_menu_input(struct session *sess, struct menu_input *input);
+
 #endif //SSB_TERMINAL_H
