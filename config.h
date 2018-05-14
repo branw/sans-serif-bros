@@ -1,7 +1,7 @@
 #ifndef SSB_CONFIG_H
 #define SSB_CONFIG_H
 
-#define DEBUG_INCOMING 1
+#define DEBUG_INCOMING 0
 #define DEBUG_OUTGOING 0
 
 #define MAX_SESSIONS 2

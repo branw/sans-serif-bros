@@ -144,23 +144,31 @@ void terminal_read_menu_input(struct session *sess, struct menu_input *input) {
         case 3:
             if (val0 == '\x1b' && val1 == '[' && val2 == 'A') {
                 input->y = 1;
+                goto consume_2;
             }
             if (val0 == '\x1b' && val1 == '[' && val2 == 'B') {
                 input->y = -1;
+                goto consume_2;
             }
             if (val0 == '\x1b' && val1 == '[' && val2 == 'C') {
                 input->x = 1;
+                goto consume_2;
             }
             if (val0 == '\x1b' && val1 == '[' && val2 == 'D') {
                 input->x = -1;
+                goto consume_2;
             }
 
         case 2:
             if (val0 == '\x0d' && (val1 == '\x00' || val1 == '\x0a')) {
                 input->enter = true;
+                goto consume_1;
             }
 
         case 1:
+            // Given that there's no telling ESC followed by a letter from its
+            // ALT counterpart, we'll just hope that no other characters were
+            // received when ESC was explicitly pressed
             if (val0 == '\x1b' && available == 1) {
                 input->esc = true;
             }
@@ -169,4 +177,12 @@ void terminal_read_menu_input(struct session *sess, struct menu_input *input) {
             }
         }
     }
+
+    return;
+
+    // Get rid of the extra consumed bytes that were only peeked at
+consume_2:
+    terminal_read(sess);
+consume_1:
+    terminal_read(sess);
 }

@@ -58,8 +58,17 @@ static bool title_screen_update(struct session *sess) {
 }
 
 static bool game_screen_update(struct session *sess) {
+    static bool paused = false;
+
     terminal_read_menu_input(sess, &sess->state.game_state.input);
-    game_update(&sess->state.game_state);
+
+    if (sess->state.game_state.input.enter) {
+        game_init(&sess->state.game_state);
+    }
+
+    if (!paused) {
+        game_update(&sess->state.game_state);
+    }
 
     terminal_reset(sess);
 
@@ -69,9 +78,33 @@ static bool game_screen_update(struct session *sess) {
         terminal_write(sess, "\x1b[41m");
     }
 
+    if (sess->state.game_state.input.esc) {
+        paused = !paused;
+    }
+
+    if (paused) {
+        terminal_write(sess, "\x1b[30;1m");
+    }
+
+    unsigned off_x = 2, off_y = 2;
+
     for (unsigned row = 0; row < 25; ++row) {
-        terminal_move(sess, 0, row);
+        terminal_move(sess, off_x + 0, off_y + row);
+        if (row == 24) {
+            terminal_underline(sess, true);
+        }
         terminal_send(sess, sess->state.game_state.field[row], 80);
+    }
+
+    terminal_reset(sess);
+
+    terminal_move(sess, off_x, off_y + 25);
+    terminal_write(sess, "[Level 1]");
+
+    terminal_rect(sess, off_x - 1, off_y - 1, 82, 28, '~');
+
+    if (paused) {
+        terminal_rect(sess, 20, 5, 30, 12, '#');
     }
 
     return true;

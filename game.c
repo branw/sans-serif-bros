@@ -41,6 +41,7 @@ void game_init(struct game_state *state) {
             "                                                                             ///"
             "################################################################################";
 
+
     memcpy(state->field, stage, 25 * 80);
 }
 
@@ -243,7 +244,9 @@ static void process_frame_1(struct game_state *state) {
                 case '?': {
                     for (int dy = -1; dy <= 1; ++dy) {
                         for (int dx = -1; dx <= 1; ++dx) {
-                            if (state->field[y + dy][x + dx] == '0') {
+                            if ((x + dx) >= 0 && (y + dx) >= 0 &&
+                                (x + dx) <= 79 && (y + dy) <= 24 &&
+                                state->field[y + dy][x + dx] == '0') {
                                 state->next_field[y][x] = '0';
                             }
                         }
@@ -300,7 +303,7 @@ static void process_frame_1(struct game_state *state) {
                     if (!probe(state, x, y + 1, ch)) {
                         state->next_field[y + 1][x] = ch;
                         state->next_field[y][x] = ' ';
-                    } else if (y < 23) {
+                    } else if (y < 24) {
                         char fl = state->field[y + 1][x];
 
                         if (fl == '(' || fl == ')' || state->tired) {
@@ -345,7 +348,7 @@ static void process_frame_1(struct game_state *state) {
                                 state->next_field[y + 1][x] = ch;
                                 state->next_field[y][x] = ' ';
                             } else if (y < 24 && state->field[y + 1][x] == '~') {
-
+                                replace(state, '@', '0');
                             } else if (y < 24 && state->field[y + 1][x] == '`') {
                                 state->reverse = true;
                             }
