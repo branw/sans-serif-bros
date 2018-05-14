@@ -19,17 +19,15 @@ void state_init(struct session *sess) {
     sess->state.input_buf_read = sess->state.input_buf_write = 0;
 }
 
-static bool title_screen_update(struct session *sess) {
-    terminal_move(sess, 0, 0);
-    terminal_rect(sess, 0, 0, 80, 25, '#');
+struct menu_input {
+    bool esc, enter, space;
+    int x, y;
+};
 
-    terminal_move(sess, 25, 11);
-    terminal_write(sess, "hello, ");
-    terminal_inverse(sess, true);
-    terminal_write(sess, "world!");
-    terminal_inverse(sess, false);
+static void parse_menu_input(struct session *sess, struct menu_input *input) {
+    input->esc = input->enter = input->space = false;
+    input->x = input->y = 0;
 
-    // Parse input buffer
     int available;
     while ((available = terminal_available(sess)) > 0) {
         char val0 = terminal_read(sess), val1 = terminal_peek(sess, 0),
@@ -38,20 +36,61 @@ static bool title_screen_update(struct session *sess) {
         default:
         case 3:
             if (val0 == '\x1b' && val1 == '[' && val2 == 'A') {
-                terminal_move(sess, 39, 0);
-                terminal_write(sess, ".");
-            } else if (val0 == '\x1b' && val1 == '[' && val2 == 'B') {
-                terminal_move(sess, 39, 24);
-                terminal_write(sess, ".");
-            } else if (val0 == '\x1b' && val1 == '[' && val2 == 'C') {
-                terminal_move(sess, 79, 12);
-                terminal_write(sess, ".");
-            } else if (val0 == '\x1b' && val1 == '[' && val2 == 'D') {
-                terminal_move(sess, 0, 12);
-                terminal_write(sess, ".");
+                input->y = 1;
+            }
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'B') {
+                input->y = -1;
+            }
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'C') {
+                input->x = 1;
+            }
+            if (val0 == '\x1b' && val1 == '[' && val2 == 'D') {
+                input->x = -1;
+            }
+
+        case 2:
+            if (val0 == '\x0d' && (val1 == '\x00' || val1 == '\x0a')) {
+                input->enter = true;
+            }
+
+        case 1:
+            if (val0 == '\x1b' && available == 1) {
+                input->esc = true;
+            }
+            if (val0 == '\x20') {
+                input->space = true;
             }
         }
     }
+}
+
+static bool title_screen_update(struct session *sess) {
+    terminal_move(sess, 0, 0);
+    terminal_rect(sess, 0, 0, 80, 25, '#');
+
+    // Parse input buffer
+    struct menu_input input;
+    parse_menu_input(sess, &input);
+
+    if (input.esc) {
+        return false;
+    }
+
+    if (input.space || input.enter) {
+        terminal_inverse(sess, true);
+    } else {
+        terminal_inverse(sess, false);
+    }
+
+    static unsigned x = 39, y = 12;
+
+    x += input.x;
+    y -= input.y;
+
+    terminal_move(sess, x, y);
+    terminal_write(sess, "@");
+
+    terminal_inverse(sess, false);
 
     return true;
 }
