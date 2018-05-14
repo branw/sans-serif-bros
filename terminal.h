@@ -33,6 +33,12 @@ void terminal_recv(struct session *sess, char *buf, int len);
 
 void terminal_parse(struct session *sess, char *buf, int len);
 
+unsigned terminal_available(struct session *sess);
+
+char terminal_read(struct session *sess);
+
+char terminal_peek(struct session *sess, unsigned n);
+
 void terminal_write(struct session *sess, char *buf);
 
 void terminal_move(struct session *sess, unsigned x, unsigned y);

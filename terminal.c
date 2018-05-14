@@ -29,8 +29,36 @@ void terminal_recv(struct session *sess, char *buf, int len) {
     terminal_parse(sess, buf, len);
 }
 
+#define INPUT_BUF_MASK(val) ((val) & (INPUT_BUF_LEN - 1))
+
+#define INPUT_BUF_SIZE(state) ((state).input_buf_write - (state).input_buf_read)
+#define INPUT_BUF_EMPTY(state) ((state).input_buf_read == (state).input_buf_write)
+#define INPUT_BUF_FULL(state) (INPUT_BUF_SIZE(state) == INPUT_BUF_LEN)
+
 void terminal_parse(struct session *sess, char *buf, int len) {
-    //TODO strip NVT packets
+    // Check if there's room in the input buffer, otherwise we're discarding the incoming data!
+    if ((sess->state.input_buf_write - sess->state.input_buf_read) == INPUT_BUF_LEN) {
+        fprintf(stderr, "%d: input buffer full\n", sess->id);
+        return;
+    }
+
+    // Naively feed data to the input buffer
+    //TODO don't do this
+    for (int i = 0; i < len && !INPUT_BUF_FULL(sess->state); ++i) {
+        sess->state.input_buf[INPUT_BUF_MASK(sess->state.input_buf_write++)] = buf[i];
+    }
+}
+
+unsigned terminal_available(struct session *sess) {
+    return INPUT_BUF_SIZE(sess->state);
+}
+
+char terminal_read(struct session *sess) {
+    return sess->state.input_buf[INPUT_BUF_MASK(sess->state.input_buf_read++)];
+}
+
+char terminal_peek(struct session *sess, unsigned n) {
+    return sess->state.input_buf[INPUT_BUF_MASK(sess->state.input_buf_read + n)];
 }
 
 void terminal_write(struct session *sess, char *buf) {
