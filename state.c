@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "state.h"
 #include "session.h"
+#include "util.h"
 
 void state_init(struct session *sess) {
     // Initialize the states
@@ -92,7 +93,19 @@ static bool game_screen_update(struct session *sess) {
         if (row == ROWS - 1) {
             terminal_underline(sess, true);
         }
-        terminal_send(sess, sess->state.game_state.field[row], COLUMNS);
+
+        // This works when the client is using CP-1252:
+        //terminal_send(sess, (char *)(sess->state.game_state.field[row]),
+        //              sizeof(unsigned long) * COLUMNS);
+
+        // This works when the client is using UTF-8:
+        char line[4 * COLUMNS] = {0}, *end = &line[4 * COLUMNS - 1], *p = line;
+
+        for (unsigned column = 0; column < COLUMNS; ++column) {
+            utf8_encode(&p, end, sess->state.game_state.field[row][column]);
+        }
+
+        terminal_write(sess, line);
     }
 
     terminal_reset(sess);

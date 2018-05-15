@@ -11,8 +11,8 @@ struct game_state {
     bool reverse;
     int tired;
 
-    char field[ROWS][COLUMNS];
-    char next_field[ROWS][COLUMNS];
+    unsigned long field[ROWS][COLUMNS];
+    unsigned long next_field[ROWS][COLUMNS];
 
     struct menu_input input;
 };
