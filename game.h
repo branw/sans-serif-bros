@@ -2,6 +2,7 @@
 #define SSB_GAME_H
 
 #include "terminal.h"
+#include "config.h"
 
 struct game_state {
     unsigned tick;
@@ -10,8 +11,8 @@ struct game_state {
     bool reverse;
     int tired;
 
-    char field[25][80];
-    char next_field[25][80];
+    char field[ROWS][COLUMNS];
+    char next_field[ROWS][COLUMNS];
 
     struct menu_input input;
 };

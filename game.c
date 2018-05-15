@@ -26,7 +26,8 @@ void game_init(struct game_state *state) {
             "                                              ##                                "
             "                                              ##                                "
             "       ##                                     ##                                "
-            "      ####             e             \xa3   \xa3    ##                                "
+            "      ####             e             \xa3   \xa3    ##                       "
+            "         "
             "      ####           ###########################                                "
             "       ##           ###         #                                               "
             "       ##   I      ####         #                                               "
@@ -42,12 +43,12 @@ void game_init(struct game_state *state) {
             "################################################################################";
 
 
-    memcpy(state->field, stage, 25 * 80);
+    memcpy(state->field, stage, ROWS * COLUMNS);
 }
 
 static void replace(struct game_state *state, char from, char to) {
-    for (unsigned y = 0; y < 25; ++y) {
-        for (unsigned x = 0; x < 80; ++x) {
+    for (unsigned y = 0; y < ROWS; ++y) {
+        for (unsigned x = 0; x < COLUMNS; ++x) {
             if (state->field[y][x] == from) {
                 state->next_field[y][x] = to;
             }
@@ -56,8 +57,8 @@ static void replace(struct game_state *state, char from, char to) {
 }
 
 static void swap(struct game_state *state, char a, char b) {
-    for (unsigned y = 0; y < 25; ++y) {
-        for (unsigned x = 0; x < 80; ++x) {
+    for (unsigned y = 0; y < ROWS; ++y) {
+        for (unsigned x = 0; x < COLUMNS; ++x) {
             if (state->field[y][x] == a) {
                 state->next_field[y][x] = b;
                 state->field[y][x] = ' ';
@@ -70,7 +71,7 @@ static void swap(struct game_state *state, char a, char b) {
 }
 
 static bool probe(struct game_state *state, unsigned x, unsigned y, char ch) {
-    if (y >= 25 || x >= 80) {
+    if (y >= ROWS || x >= COLUMNS) {
         return true;
     }
 
@@ -173,12 +174,12 @@ static void process_frame_1(struct game_state *state) {
     int money_left = 0;
     int players_left = 0;
 
-    for (unsigned y = 0; y < 25; ++y) {
-        for (unsigned x = 0; x < 80; ++x) {
+    for (unsigned y = 0; y < ROWS; ++y) {
+        for (unsigned x = 0; x < COLUMNS; ++x) {
             char ch = state->field[y][x];
 
             if ((ch == 'I' || ch == '[' || ch == ']' || ch == 'O' || ch == '%' || ch == MONEY) &&
-                y == 24) {
+                y == ROWS - 1) {
                 state->next_field[y][x] = ' ';
             } else if (ch >= '1' && ch <= '9' && y > 0 && state->field[y - 1][x] != ' ') {
                 state->next_field[y][x] = (char) (ch - 1);
@@ -190,13 +191,14 @@ static void process_frame_1(struct game_state *state) {
                 }
 
                 case '%': {
-                    if (y < 24 && state->field[y + 1][x] == ';' && state->next_field[y][x] == '%') {
+                    if (y < ROWS - 1 && state->field[y + 1][x] == ';' && state->next_field[y][x] ==
+                                                                         '%') {
                         state->next_field[y][x] = ' ';
-                        if (y < 23) {
+                        if (y < ROWS - 2) {
                             state->next_field[y + 2][x] = ch;
                         }
                     } else if (!probe(state, x, y + 1, ch) ||
-                               (y < 24 && state->field[y + 1][x] == 'I')) {
+                               (y < ROWS - 1 && state->field[y + 1][x] == 'I')) {
                         state->next_field[y + 1][x] = ch;
                         state->next_field[y][x] = ' ';
                     }
@@ -222,9 +224,10 @@ static void process_frame_1(struct game_state *state) {
                 }
 
                 case 'O': {
-                    if (y < 24 && state->field[y + 1][x] == ';' && state->next_field[y][x] == 'O') {
+                    if (y < ROWS - 1 &&
+                        state->field[y + 1][x] == ';' && state->next_field[y][x] == 'O') {
                         state->next_field[y][x] = ' ';
-                        if (y < 23) {
+                        if (y < ROWS - 2) {
                             state->next_field[y + 2][x] = ch;
                         }
                     } else if (!probe(state, x, y + 1, ch)) {
@@ -245,7 +248,7 @@ static void process_frame_1(struct game_state *state) {
                     for (int dy = -1; dy <= 1; ++dy) {
                         for (int dx = -1; dx <= 1; ++dx) {
                             if ((x + dx) >= 0 && (y + dx) >= 0 &&
-                                (x + dx) <= 79 && (y + dy) <= 24 &&
+                                (x + dx) <= COLUMNS - 1 && (y + dy) <= ROWS - 1 &&
                                 state->field[y + dy][x + dx] == '0') {
                                 state->next_field[y][x] = '0';
                             }
@@ -260,7 +263,7 @@ static void process_frame_1(struct game_state *state) {
                     if (!probe(state, x, y + 1, ch)) {
                         state->next_field[y + 1][x] = ch;
                         state->next_field[y][x] = ' ';
-                    } else if (y < 24 && state->field[y + 1][x] == 'I') {
+                    } else if (y < ROWS - 1 && state->field[y + 1][x] == 'I') {
                         state->next_field[y][x] = ' ';
                     }
                     break;
@@ -268,11 +271,12 @@ static void process_frame_1(struct game_state *state) {
 
                 case 'T': {
                     if (y > 0 && state->field[y - 1][x] == 'I') {
-                        if (x > 0 && LEFT && state->next_field[y - 1][x - 1] == 'I' && !probe
-                                (state, x - 1, y, ch)) {
+                        if (x > 0 && LEFT &&
+                            state->next_field[y - 1][x - 1] == 'I' && !probe(state, x - 1, y, ch)) {
                             state->next_field[y][x - 1] = ch;
                             state->next_field[y][x] = ' ';
-                        } else if (x < 79 && RIGHT && state->next_field[y - 1][x + 1] == 'I' &&
+                        } else if (x < COLUMNS - 1 && RIGHT &&
+                                   state->next_field[y - 1][x + 1] == 'I' &&
                                    !probe(state, x + 1, y, ch)) {
                             state->next_field[y][x + 1] = ch;
                             state->next_field[y][x] = ' ';
@@ -303,7 +307,7 @@ static void process_frame_1(struct game_state *state) {
                     if (!probe(state, x, y + 1, ch)) {
                         state->next_field[y + 1][x] = ch;
                         state->next_field[y][x] = ' ';
-                    } else if (y < 24) {
+                    } else if (y < ROWS - 1) {
                         char fl = state->field[y + 1][x];
 
                         if (fl == '(' || fl == ')' || state->tired) {
@@ -318,7 +322,7 @@ static void process_frame_1(struct game_state *state) {
                                 state->next_field[y - 1][x - 1] = ch;
                                 state->next_field[y][x] = ' ';
                             }
-                        } else if (RIGHT && x < 79 && y > 0) {
+                        } else if (RIGHT && x < COLUMNS - 1 && y > 0) {
                             if (!probe(state, x + 1, y, ch)) {
                                 state->next_field[y][x + 1] = ch;
                                 state->next_field[y][x] = ' ';
@@ -331,25 +335,25 @@ static void process_frame_1(struct game_state *state) {
                                 !probe(state, x, y - 2, ch)) {
                                 state->next_field[y - 2][x] = 'I';
                                 state->next_field[y][x] = ' ';
-                            } else if (y > 0 && y < 24 && state->field[y + 1][x] == '"' &&
+                            } else if (y > 0 && y < ROWS - 1 && state->field[y + 1][x] == '"' &&
                                        !probe(state, x, y - 1, ch)) {
                                 state->next_field[y + 1][x] = ' ';
                                 state->next_field[y][x] = '"';
                                 state->next_field[y - 1][x] = ch;
                             }
                         } else if (DOWN) {
-                            if (y < 24 && state->field[y + 1][x] == '-' &&
+                            if (y < ROWS - 1 && state->field[y + 1][x] == '-' &&
                                 !probe(state, x, y + 2, ch)) {
                                 state->next_field[y + 2][x] = 'I';
                                 state->next_field[y][x] = ' ';
-                            } else if (y < 24 && state->field[y + 1][x] == '"' &&
+                            } else if (y < ROWS - 1 && state->field[y + 1][x] == '"' &&
                                        !probe(state, x, y + 2, '"')) {
                                 state->next_field[y + 2][x] = '"';
                                 state->next_field[y + 1][x] = ch;
                                 state->next_field[y][x] = ' ';
-                            } else if (y < 24 && state->field[y + 1][x] == '~') {
+                            } else if (y < ROWS - 1 && state->field[y + 1][x] == '~') {
                                 replace(state, '@', '0');
-                            } else if (y < 24 && state->field[y + 1][x] == '`') {
+                            } else if (y < ROWS - 1 && state->field[y + 1][x] == '`') {
                                 state->reverse = true;
                             }
                         }
@@ -421,7 +425,7 @@ static void process_frame_1(struct game_state *state) {
                 case '}':
                 case '[':
                 case ']': {
-                    if (y < 24) {
+                    if (y < ROWS - 1) {
                         int d = (ch == '[' || ch == '{') ? -1 : 1;
                         bool gr = (ch == '[' || ch == ']');
                         char od = (char) ((d > 0) ? (gr ? '[' : '{') : (gr ? ']' : '}'));
@@ -458,8 +462,8 @@ static void process_frame_1(struct game_state *state) {
 }
 
 static void process_frame_8(struct game_state *state) {
-    for (unsigned y = 0; y < 25; ++y) {
-        for (unsigned x = 0; x < 80; ++x) {
+    for (unsigned y = 0; y < ROWS; ++y) {
+        for (unsigned x = 0; x < COLUMNS; ++x) {
             char ch = state->field[y][x];
             switch (ch) {
             case '=': {
@@ -498,7 +502,7 @@ void game_update(struct game_state *state) {
         return;
     }
 
-    memcpy(state->next_field, state->field, 25 * 80);
+    memcpy(state->next_field, state->field, ROWS * COLUMNS);
 
     if (state->reverse) {
         swap(state, '{', '}');
@@ -513,7 +517,7 @@ void game_update(struct game_state *state) {
         process_frame_8(state);
     }
 
-    memcpy(state->field, state->next_field, 25 * 80);
+    memcpy(state->field, state->next_field, ROWS * COLUMNS);
 
     if (state->tired) {
         ++state->tired;

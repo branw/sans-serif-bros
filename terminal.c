@@ -2,8 +2,13 @@
 #include <stdio.h>
 #include "terminal.h"
 #include "session.h"
-#include "config.h"
 
+void terminal_init(struct terminal_state *state) {
+    state->input_buf_read = state->input_buf_write = 0;
+
+    state->dimensions_reported = false;
+    state->w = state->h = 0;
+}
 
 void terminal_send(struct session *sess, char *buf, int len) {
 #if DEBUG_OUTGOING
@@ -106,9 +111,26 @@ void terminal_rect(struct session *sess, unsigned x, unsigned y, unsigned w, uns
     free(buf);
 }
 
-void terminal_write_at(struct session *sess, unsigned x, unsigned y, char *buf) {
+void terminal_pretty_rect(struct session *sess, unsigned x, unsigned y, unsigned w, unsigned h) {
+    char *buf = malloc(sizeof(char) * w);
+    memset(buf, '-', w);
+    buf[0] = '/';
+    buf[w - 1] = '\\';
+
     terminal_move(sess, x, y);
-    terminal_write(sess, buf);
+    terminal_send(sess, buf, w);
+    for (unsigned row = y + 1; row < y + h - 1; ++row) {
+        terminal_move(sess, x, row);
+        terminal_write(sess, "|");
+        terminal_move(sess, x + w - 1, row);
+        terminal_write(sess, "|");
+    }
+    buf[0] = '\\';
+    buf[w - 1] = '/';
+    terminal_move(sess, x, y + h - 1);
+    terminal_send(sess, buf, w);
+
+    free(buf);
 }
 
 void terminal_reset(struct session *sess) {
@@ -125,10 +147,6 @@ void terminal_underline(struct session *sess, bool state) {
 
 void terminal_inverse(struct session *sess, bool state) {
     terminal_write(sess, state ? CSI "7m" : CSI "27m");
-}
-
-void terminal_init(struct terminal_state *state) {
-    state->input_buf_read = state->input_buf_write = 0;
 }
 
 void terminal_read_menu_input(struct session *sess, struct menu_input *input) {
@@ -176,13 +194,24 @@ void terminal_read_menu_input(struct session *sess, struct menu_input *input) {
                 input->space = true;
             }
         }
+
+        continue;
+
+        // Get rid of the extra bytes that were only peeked at
+consume_2:
+        terminal_read(sess);
+consume_1:
+        terminal_read(sess);
+    }
+}
+
+bool terminal_dimensions(struct session *sess, unsigned *w, unsigned *h) {
+    if (!sess->state.terminal_state.dimensions_reported) {
+        return false;
     }
 
-    return;
+    *w = sess->state.terminal_state.w;
+    *h = sess->state.terminal_state.h;
 
-    // Get rid of the extra consumed bytes that were only peeked at
-consume_2:
-    terminal_read(sess);
-consume_1:
-    terminal_read(sess);
+    return true;
 }

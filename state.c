@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "state.h"
 #include "session.h"
-#include "config.h"
 
 void state_init(struct session *sess) {
     // Initialize the states
@@ -88,20 +87,20 @@ static bool game_screen_update(struct session *sess) {
 
     unsigned off_x = 2, off_y = 2;
 
-    for (unsigned row = 0; row < 25; ++row) {
+    for (unsigned row = 0; row < ROWS; ++row) {
         terminal_move(sess, off_x + 0, off_y + row);
-        if (row == 24) {
+        if (row == ROWS - 1) {
             terminal_underline(sess, true);
         }
-        terminal_send(sess, sess->state.game_state.field[row], 80);
+        terminal_send(sess, sess->state.game_state.field[row], COLUMNS);
     }
 
     terminal_reset(sess);
 
-    terminal_move(sess, off_x, off_y + 25);
+    terminal_move(sess, off_x, off_y + ROWS);
     terminal_write(sess, "[Level 1]");
 
-    terminal_rect(sess, off_x - 1, off_y - 1, 82, 28, '~');
+    terminal_pretty_rect(sess, off_x - 1, off_y - 1, COLUMNS + 2, ROWS + 3);
 
     if (paused) {
         terminal_rect(sess, 20, 5, 30, 12, '#');

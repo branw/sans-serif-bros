@@ -27,6 +27,19 @@
 
 struct session;
 
+// Number of bytes to store for each session; must be a power of 2
+#define INPUT_BUF_LEN 512
+
+struct terminal_state {
+    char input_buf[INPUT_BUF_LEN];
+    unsigned input_buf_read, input_buf_write;
+
+    bool dimensions_reported;
+    unsigned w, h;
+};
+
+void terminal_init(struct terminal_state *state);
+
 void terminal_send(struct session *sess, char *buf, int len);
 
 void terminal_recv(struct session *sess, char *buf, int len);
@@ -50,7 +63,7 @@ void terminal_cursor(struct session *sess, bool state);
 void terminal_rect(struct session *sess, unsigned x, unsigned y, unsigned w, unsigned h,
                    char symbol);
 
-void terminal_write_at(struct session *sess, unsigned x, unsigned y, char *buf);
+void terminal_pretty_rect(struct session *sess, unsigned x, unsigned y, unsigned w, unsigned h);
 
 void terminal_reset(struct session *sess);
 
@@ -60,21 +73,13 @@ void terminal_underline(struct session *sess, bool state);
 
 void terminal_inverse(struct session *sess, bool state);
 
-// Number of bytes to store for each session; must be a power of 2
-#define INPUT_BUF_LEN 512
-
-struct terminal_state {
-    char input_buf[INPUT_BUF_LEN];
-    unsigned input_buf_read, input_buf_write;
-};
-
-void terminal_init(struct terminal_state *state);
-
 struct menu_input {
     bool esc, enter, space;
     int x, y;
 };
 
 void terminal_read_menu_input(struct session *sess, struct menu_input *input);
+
+bool terminal_dimensions(struct session *sess, unsigned *w, unsigned *h);
 
 #endif //SSB_TERMINAL_H

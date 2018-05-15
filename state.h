@@ -7,9 +7,6 @@
 #include "terminal.h"
 #include "game.h"
 
-// Duration in ms between updates
-#define TICK_DURATION 100
-
 enum screen {
     title_screen, game_screen
 };
