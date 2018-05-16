@@ -1,4 +1,14 @@
+#ifdef _WIN32
 #include <winsock2.h>
+
+#endif
+#ifdef __linux__
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <string.h>
+#endif
+
 #include <stdio.h>
 #include "terminal.h"
 #include "session.h"

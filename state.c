@@ -9,12 +9,13 @@ void state_init(struct session *sess) {
 
     terminal_init(&sess->state.terminal_state);
     game_init(&sess->state.game_state);
-    canvas_init(&sess->state.canvas, 80, 25);
+    canvas_init(&sess->state.canvas, 100, 30);
 
     // Negotiate Telnet configuration
     terminal_send(sess, IAC WILL ECHO, 3);
     terminal_send(sess, IAC DONT ECHO, 3);
     terminal_send(sess, IAC WILL SUPPRESS_GO_AHEAD, 3);
+    terminal_send(sess, IAC WILL NAWS, 3);
 
     // Leave a greeting to describe the game version
     terminal_write(sess, WELCOME_MESSAGE);
@@ -38,12 +39,20 @@ static bool game_screen_update(struct session *sess) {
 
     terminal_read_menu_input(sess, &sess->state.game_state.input);
 
-    canvas_rect(CANVAS, 0, 0, 80, 25, '#');
+    if (sess->state.game_state.input.enter) {
+        game_init(&sess->state.game_state);
+    }
 
-    static unsigned i = 1;
-    unsigned x = i % 80, y = i / 80;
-    canvas_put(CANVAS, x, y, '@');
-    i += 1;
+    if (sess->state.game_state.input.esc) {
+        paused = !paused;
+    }
+
+    if (!paused) {
+        game_update(&sess->state.game_state);
+    }
+
+    canvas_write_block_utf32(CANVAS, 2, 2, 80, 25,
+                             (unsigned long *) sess->state.game_state.field, ROWS * COLUMNS);
 
     return true;
 }
@@ -63,6 +72,11 @@ bool state_update(struct session *sess) {
 
     sess->state.last_tick = current;
 
+    unsigned w, h;
+    if (terminal_dimensions(sess, &w, &h)) {
+        canvas_resize(&sess->state.canvas, w, h);
+    }
+
     // Dispatch state handler
     bool disconnect = false;
     switch (sess->state.screen) {
@@ -77,11 +91,10 @@ bool state_update(struct session *sess) {
     }
 
     // Render any updates to the screen
-    //TODO find the max buffer that the connection can send
+    // Assume that we can send in blocks of at least 512
     char buf[512];
     size_t len;
     while (canvas_flush(CANVAS, buf, 512, &len)) {
-        printf("%.*s\n", (int) len, buf);
         terminal_send(sess, buf, (int) len);
     }
 

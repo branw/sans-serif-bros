@@ -22,29 +22,25 @@ struct cell {
     enum color foreground : 3;
     enum color background : 3;
     unsigned long bold : 1;
-    unsigned long dirty : 1;
 };
 
 // Zero out a cell
 #define CANVAS_CELL_CLEAR(cell) do { (cell).code_point = 0; (cell).italic = false; \
         (cell).underline = false; (cell).blink = false; (cell).foreground = black; \
-        (cell).background = black; (cell).bold = false; (cell).dirty = false; } while (0)
+        (cell).background = black; (cell).bold = false; } while (0)
 
-// Check if two cells are equivalent besides their dirty flags
+// Check if two cells are equivalent
 #define CANVAS_CELL_EQ(a, b) ((a).code_point == (b).code_point && (a).italic == (b).italic && \
     (a).underline == (b).underline && (a).blink == (b).blink && (a).bold == (b).bold && \
     (a).foreground == (b).foreground && (a).background == (b).background && (a).bold == (b).bold)
 
 struct canvas {
-    struct cell *canvas;
+    struct cell *buf[2];
     unsigned w, h;
-
-    bool window;
-    struct canvas *window_canvas;
-    unsigned window_x1, window_y1, window_x2, window_y2;
 
     struct cell style;
 
+    bool force_flush;
     size_t flush_index;
     struct cell flush_state;
     size_t flush_encode_offset;
@@ -63,12 +59,10 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 
 bool canvas_forced_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_written);
 
-void canvas_write_all_utf32(struct canvas *canvas, unsigned long *buf, size_t len);
+void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
+                              unsigned h, unsigned long *buf, size_t len);
 
 void canvas_put(struct canvas *canvas, unsigned x, unsigned y, unsigned long c);
-
-void canvas_create_window(struct canvas *canvas, unsigned x1, unsigned y1,
-                          unsigned x2, unsigned y2, struct canvas *window);
 
 void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol);

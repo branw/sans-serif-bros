@@ -3,6 +3,10 @@
 
 #include "session.h"
 
+#ifdef __linux__
+typedef int SOCKET;
+#endif
+
 struct server {
     SOCKET listen_sock;
     struct session *sessions;

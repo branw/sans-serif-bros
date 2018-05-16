@@ -1,8 +1,15 @@
 #ifndef SSB_SESSION_H
 #define SSB_SESSION_H
 
+#ifdef _WIN32
 #include <Winsock2.h>
 #include <stdbool.h>
+
+#endif
+
+#ifdef __linux__
+typedef int SOCKET;
+#endif
 
 #include "state.h"
 

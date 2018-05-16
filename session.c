@@ -1,6 +1,28 @@
+#ifdef _WIN32
 #define _WIN32_WINNT _WIN32_WINNT_WIN8
 
 #include <ws2tcpip.h>
+
+#endif
+
+#ifdef __linux
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+
+#define SOCKET_ERROR -1
+#define INVALID_SOCKET -1
+
+#define WSAEWOULDBLOCK EWOULDBLOCK
+
+static int WSAGetLastError() {
+    return errno;
+}
+#endif
+
 #include <stdio.h>
 
 #include "session.h"
@@ -8,7 +30,7 @@
 bool session_create(struct session *sess, SOCKET client_sock) {
     sess->client_sock = client_sock;
 
-    SOCKADDR_IN info = {0};
+    struct sockaddr_in info = {0};
     int info_size = sizeof(info);
     getpeername(client_sock, (struct sockaddr *) &info, &info_size);
 
@@ -20,7 +42,12 @@ bool session_create(struct session *sess, SOCKET client_sock) {
 
     // Use non-blocking mode
     u_long mode = 1;
+#ifdef _WIN32
     ioctlsocket(client_sock, FIONBIO, &mode);
+#endif
+#ifdef __linux__
+    ioctl(client_sock, FIONBIO, &mode);
+#endif
 
     // Initialize the game state
     state_init(sess);
@@ -30,12 +57,22 @@ void session_shutdown(struct session *sess) {
     printf("#%d disconnected\n", sess->id);
 
     // Disable sending to the socket
+#ifdef _WIN32
     int res = shutdown(sess->client_sock, SD_SEND);
+#endif
+#ifdef __linux__
+    int res = shutdown(sess->client_sock, SHUT_WR);
+#endif
     if (res == SOCKET_ERROR) {
         fprintf(stderr, "#%d: shutdown failed (%d)\n", sess->id, WSAGetLastError());
     }
 
+#ifdef _WIN32
     closesocket(sess->client_sock);
+#endif
+#ifdef __linux
+    close(sess->client_sock);
+#endif
 }
 
 #define RECV_BUF_LEN 512

@@ -1,14 +1,35 @@
+#ifdef _WIN32
 #define _WIN32_WINNT _WIN32_WINNT_WIN8
 
 #include <Winsock2.h>
 #include <ws2tcpip.h>
+
+#endif
+
+#ifdef __linux__
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netdb.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+#define SOCKET_ERROR -1
+#define INVALID_SOCKET -1
+
+static int WSAGetLastError() {
+    return errno;
+}
+#endif
+
 #include <stdio.h>
 #include <stdbool.h>
 
 #include "server.h"
-#include "config.h"
 
 bool server_create(struct server *server) {
+#if _WIN32
     // Initialize WSA
     static bool wsa_initialized = false;
     if (!wsa_initialized) {
@@ -22,6 +43,7 @@ bool server_create(struct server *server) {
 
         wsa_initialized = true;
     }
+#endif
 
     struct addrinfo *addr = NULL;
     struct addrinfo hints = {0};
@@ -50,7 +72,12 @@ bool server_create(struct server *server) {
     freeaddrinfo(addr);
     if (res == SOCKET_ERROR) {
         fprintf(stderr, "bind failed (%d)\n", WSAGetLastError());
+#ifdef _WIN32
         closesocket(sock);
+#endif
+#ifdef __linux__
+        close(sock);
+#endif
         return false;
     }
 
@@ -58,7 +85,12 @@ bool server_create(struct server *server) {
     res = listen(sock, SOMAXCONN);
     if (res == SOCKET_ERROR) {
         fprintf(stderr, "listen failed (%d)\n", WSAGetLastError());
+#ifdef _WIN32
         closesocket(sock);
+#endif
+#ifdef __linux__
+        close(sock);
+#endif
         return false;
     }
 
@@ -75,7 +107,12 @@ void server_accept_session(struct server *server) {
     SOCKET sock = accept(server->listen_sock, NULL, NULL);
     if (sock == INVALID_SOCKET) {
         fprintf(stderr, "accept failed (%d)\n", WSAGetLastError());
+#ifdef _WIN32
         closesocket(sock);
+#endif
+#ifdef __linux__
+        close(sock);
+#endif
         return;
     }
 
@@ -142,7 +179,12 @@ void server_disconnect_session(struct server *server, struct session *sess) {
 void server_run(struct server *server) {
     for (;;) {
         // Read from the listening socket
+#ifdef _WIN32
         struct fd_set read_set;
+#endif
+#ifdef __linux
+        fd_set read_set;
+#endif
         FD_ZERO(&read_set);
         FD_SET(server->listen_sock, &read_set);
 

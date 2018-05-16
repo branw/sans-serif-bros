@@ -24,7 +24,9 @@ execute_process(
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
 add_definitions(-DGIT_COMMIT_TIMESTAMP="${GIT_COMMIT_TIMESTAMP}")
 
+if (WIN32)
 # Link Winsock libraries
 link_libraries(ws2_32 wsock32)
+endif ()
 
 add_executable(ssb main.c server.c server.h session.c session.h state.c state.h terminal.c terminal.h config.h game.c game.h util.c util.h canvas.c canvas.h)

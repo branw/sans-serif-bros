@@ -22,16 +22,11 @@ void canvas_init(struct canvas *canvas, unsigned w, unsigned h) {
     canvas->flush_last_index = 0;
 
     // For the sake of consistency, all blank cells store spaces
-    // This also marks them all as dirty so that the first flush clears everything
-    struct cell old_cell;
-    CANVAS_CELL_CLEAR(old_cell);
     struct cell new_cell = canvas->style;
     new_cell.code_point = ' ';
-
     for (unsigned y = 0; y < h; y++) {
         for (unsigned x = 0; x < w; x++) {
-            canvas->buf[0][x + y * w] = old_cell;
-            canvas->buf[1][x + y * w] = new_cell;
+            canvas->buf[0][x + y * w] = canvas->buf[1][x + y * w] = new_cell;
         }
     }
 }
@@ -68,10 +63,7 @@ void canvas_erase(struct canvas *canvas) {
 
     for (unsigned y = y1; y < y2; y++) {
         for (unsigned x = x1; x < x2; x++) {
-            struct cell *cell = &canvas->buf[1][x + y * canvas->w];
-            if (!CANVAS_CELL_EQ(new_cell, *cell)) {
-                *cell = new_cell;
-            }
+            canvas->buf[1][x + y * canvas->w] = new_cell;
         }
     }
 }
@@ -85,8 +77,7 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 
     size_t index = canvas->flush_index, remaining = len;
     while (remaining > 0 && index < CANVAS_LEN) {
-        struct cell prev = canvas->buf[0][index];
-        struct cell next = canvas->buf[1][index];
+        struct cell prev = canvas->buf[0][index], next = canvas->buf[1][index];
 
         // Ignore unchanged cells at the cost of a cursor move which may
         // potentially be longer
@@ -95,7 +86,11 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
             continue;
         }
 
-        if (canvas->flush_last_index + 1 != index) {
+        // Move the cursor explicitly when the previous block wasn't changed or
+        // was on a different line
+        bool noncontinuous = (canvas->flush_last_index + 1 != index),
+                newline = (index % canvas->w == 0);
+        if (noncontinuous || newline) {
             int x = (int) (index % canvas->w), y = (int) (index / canvas->w);
             int escape_len = snprintf(buf, remaining, "\x1b[%d;%dH", y + 1, x + 1);
 
@@ -105,8 +100,11 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 
         canvas->flush_last_index = index;
 
+        //TODO allow for split escape sequences
+
         //TODO parse state and emit escape sequences
 
+        // Now try to emit the actual character
         size_t encoded_len = utf8_encode(canvas->flush_encode_offset, &buf, remaining,
                                          next.code_point);
 
@@ -118,11 +116,12 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
             break;
         }
 
+        canvas->flush_encode_offset = 0;
+        remaining -= encoded_len;
+
+        // Mark the cell as clean
         canvas->buf[0][index] = next;
 
-        canvas->flush_encode_offset = 0;
-
-        remaining -= encoded_len;
         index++;
     }
 
@@ -156,7 +155,7 @@ void canvas_write_utf8(struct canvas *canvas, unsigned x, unsigned y, char *msg)
 void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
                               unsigned h, unsigned long *buf, size_t len) {
     for (unsigned y = y1; y < y1 + h; y++) {
-        struct cell *cell = &canvas->buf[1][y * canvas->w];
+        struct cell *cell = &canvas->buf[1][x1 + y * canvas->w];
         for (unsigned x = x1; x < x1 + w; x++, buf++, cell++) {
             struct cell new_cell = canvas->style;
             new_cell.code_point = *buf;
