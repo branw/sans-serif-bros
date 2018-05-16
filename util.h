@@ -3,6 +3,6 @@
 
 unsigned long utf8_decode(char **s);
 
-void utf8_encode(char **s, char *end, unsigned long code);
+size_t utf8_encode(size_t offset, char **buf, size_t len, unsigned long code_point);
 
 #endif //SSB_UTIL_H

@@ -6,6 +6,7 @@
 
 #include "terminal.h"
 #include "game.h"
+#include "canvas.h"
 
 enum screen {
     title_screen, game_screen
@@ -14,6 +15,8 @@ enum screen {
 struct state {
     struct timespec last_tick;
     enum screen screen;
+
+    struct canvas canvas;
 
     struct terminal_state terminal_state;
 

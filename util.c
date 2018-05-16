@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "util.h"
 
 unsigned long utf8_decode(char **s) {
@@ -11,17 +12,21 @@ unsigned long utf8_decode(char **s) {
     return value;
 }
 
-void utf8_encode(char **s, char *end, unsigned long code) {
-    char val[4];
-    int lead_byte_max = 0x7F, val_index = 0;
-    while (code > lead_byte_max) {
-        val[val_index++] = (char) ((code & 0x3F) | 0x80);
-        code >>= 6;
-        lead_byte_max >>= (val_index == 1 ? 2 : 1);
+size_t utf8_encode(size_t offset, char **buf, size_t len, unsigned long code_point) {
+    char encoded[4] = {0};
+    unsigned long lead_byte_max = 0x7f, encoded_len = 0;
+
+    while (code_point > lead_byte_max) {
+        encoded[encoded_len++] = (char) ((code_point & 0x3f) | 0x80);
+        code_point >>= 6;
+        lead_byte_max >>= encoded_len ? 2 : 1;
     }
-    val[val_index++] = (char) ((code & lead_byte_max) | (~lead_byte_max << 1));
-    while (val_index-- && *s < end) {
-        **s = val[val_index];
-        (*s)++;
+
+    encoded[encoded_len++] = (char) ((code_point & lead_byte_max) | (~lead_byte_max << 1));
+
+    size_t index = encoded_len - offset, written = 0;
+    while (index-- && written++ < len) {
+        *(*buf)++ = encoded[index];
     }
+    return written;
 }

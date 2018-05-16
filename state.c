@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include "state.h"
 #include "session.h"
-#include "util.h"
 
 void state_init(struct session *sess) {
     // Initialize the states
     sess->state.last_tick.tv_sec = sess->state.last_tick.tv_nsec = 0;
     sess->state.screen = game_screen;
+
     terminal_init(&sess->state.terminal_state);
     game_init(&sess->state.game_state);
+    canvas_init(&sess->state.canvas, 80, 25);
 
     // Negotiate Telnet configuration
     terminal_send(sess, IAC WILL ECHO, 3);
@@ -20,104 +21,29 @@ void state_init(struct session *sess) {
 
     // Empty the terminal and hide the cursor
     terminal_clear(sess);
+    terminal_move(sess, 0, 0);
     terminal_reset(sess);
     terminal_cursor(sess, false);
 }
 
 static bool title_screen_update(struct session *sess) {
-    terminal_move(sess, 0, 0);
-    terminal_rect(sess, 0, 0, 80, 25, '#');
-
-    // Parse input buffer
-    struct menu_input input;
-    terminal_read_menu_input(sess, &input);
-
-    if (input.esc) {
-        return false;
-    }
-
-    if (input.space || input.enter) {
-        terminal_inverse(sess, true);
-    } else {
-        terminal_inverse(sess, false);
-    }
-
-    static unsigned x = 39, y = 12;
-
-    x += input.x;
-    y -= input.y;
-
-    terminal_move(sess, x, y);
-    terminal_write(sess, "@");
-
-    terminal_inverse(sess, false);
-
-    //sess->state.screen = game_screen;
 
     return true;
 }
+
+#define CANVAS &sess->state.canvas
 
 static bool game_screen_update(struct session *sess) {
     static bool paused = false;
 
     terminal_read_menu_input(sess, &sess->state.game_state.input);
 
-    if (sess->state.game_state.input.enter) {
-        game_init(&sess->state.game_state);
-    }
+    canvas_rect(CANVAS, 0, 0, 80, 25, '#');
 
-    if (!paused) {
-        game_update(&sess->state.game_state);
-    }
-
-    terminal_reset(sess);
-
-    if (sess->state.game_state.win) {
-        terminal_write(sess, "\x1b[42m");
-    } else if (sess->state.game_state.die) {
-        terminal_write(sess, "\x1b[41m");
-    }
-
-    if (sess->state.game_state.input.esc) {
-        paused = !paused;
-    }
-
-    if (paused) {
-        terminal_write(sess, "\x1b[30;1m");
-    }
-
-    unsigned off_x = 2, off_y = 2;
-
-    for (unsigned row = 0; row < ROWS; ++row) {
-        terminal_move(sess, off_x + 0, off_y + row);
-        if (row == ROWS - 1) {
-            terminal_underline(sess, true);
-        }
-
-        // This works when the client is using CP-1252:
-        //terminal_send(sess, (char *)(sess->state.game_state.field[row]),
-        //              sizeof(unsigned long) * COLUMNS);
-
-        // This works when the client is using UTF-8:
-        char line[4 * COLUMNS] = {0}, *end = &line[4 * COLUMNS - 1], *p = line;
-
-        for (unsigned column = 0; column < COLUMNS; ++column) {
-            utf8_encode(&p, end, sess->state.game_state.field[row][column]);
-        }
-
-        terminal_write(sess, line);
-    }
-
-    terminal_reset(sess);
-
-    terminal_move(sess, off_x, off_y + ROWS);
-    terminal_write(sess, "[Level 1]");
-
-    terminal_pretty_rect(sess, off_x - 1, off_y - 1, COLUMNS + 2, ROWS + 3);
-
-    if (paused) {
-        terminal_rect(sess, 20, 5, 30, 12, '#');
-    }
+    static unsigned i = 1;
+    unsigned x = i % 80, y = i / 80;
+    canvas_put(CANVAS, x, y, '@');
+    i += 1;
 
     return true;
 }
@@ -138,12 +64,26 @@ bool state_update(struct session *sess) {
     sess->state.last_tick = current;
 
     // Dispatch state handler
+    bool disconnect = false;
     switch (sess->state.screen) {
     default:
     case title_screen:
-        return title_screen_update(sess);
+        disconnect = title_screen_update(sess);
+        break;
 
     case game_screen:
-        return game_screen_update(sess);
+        disconnect = game_screen_update(sess);
+        break;
     }
+
+    // Render any updates to the screen
+    //TODO find the max buffer that the connection can send
+    char buf[512];
+    size_t len;
+    while (canvas_flush(CANVAS, buf, 512, &len)) {
+        printf("%.*s\n", (int) len, buf);
+        terminal_send(sess, buf, (int) len);
+    }
+
+    return disconnect;
 }
