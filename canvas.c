@@ -5,18 +5,11 @@
 #include "canvas.h"
 #include "util.h"
 
-#define VALIDATE_WINDOW(c) do { assert((c)->window); struct canvas *d = (c)->window; \
-    assert((c)->x1 + (c)->w <= d->w); assert((c)->y1 + (c)->h <= d->h); } while (0)
-
 void canvas_init(struct canvas *canvas, unsigned w, unsigned h) {
     // Allocate the two buffers
     canvas->buf[0] = calloc(w * h, sizeof(struct cell));
     canvas->buf[1] = calloc(w * h, sizeof(struct cell));
     canvas->w = w, canvas->h = h;
-
-    // Create a canvas instead of just a window
-    canvas->window = NULL;
-    canvas->x1 = canvas->y1 = 0;
 
     // Initialize the starting style
     canvas_reset(canvas);
@@ -44,15 +37,11 @@ void canvas_init(struct canvas *canvas, unsigned w, unsigned h) {
 }
 
 void canvas_free(struct canvas *canvas) {
-    if (!canvas->window) {
-        free(canvas->buf[0]);
-        free(canvas->buf[1]);
-    }
+    free(canvas->buf[0]);
+    free(canvas->buf[1]);
 }
 
 void canvas_resize(struct canvas *canvas, unsigned w, unsigned h) {
-    assert(!canvas->window);
-
     if (canvas->w == w && canvas->h == h) {
         return;
     }
@@ -72,12 +61,7 @@ void canvas_resize(struct canvas *canvas, unsigned w, unsigned h) {
 }
 
 void canvas_erase(struct canvas *canvas) {
-    unsigned x1 = canvas->x1, y1 = canvas->y1, x2 = x1 + canvas->w, y2 = y1 + canvas->h;
-
-    struct canvas *window = canvas;
-    if (canvas->window) {
-        canvas = canvas->window;
-    }
+    unsigned x1 = 0, y1 = 0, x2 = x1 + canvas->w, y2 = y1 + canvas->h;
 
     struct cell new_cell = canvas->style;
     new_cell.code_point = ' ';
@@ -95,8 +79,6 @@ void canvas_erase(struct canvas *canvas) {
 #define CANVAS_LEN (canvas->w * canvas->h)
 
 bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_written) {
-    assert(!canvas->window);
-
     if (canvas->flush_index == CANVAS_LEN) {
         return false;
     }
@@ -150,8 +132,6 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 }
 
 bool canvas_forced_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_written) {
-    assert(!canvas->window);
-
     canvas->force_flush = true;
     bool res = canvas_flush(canvas, buf, len, len_written);
     canvas->force_flush = false;
@@ -173,23 +153,14 @@ void canvas_write_utf8(struct canvas *canvas, unsigned x, unsigned y, char *msg)
      */
 }
 
-void canvas_write_all_utf32(struct canvas *canvas, unsigned long *buf, size_t len) {
-    unsigned x1 = canvas->x1, y1 = canvas->y1, x2 = x1 + canvas->w, y2 = y1 + canvas->h;
-
-    struct canvas *window = canvas;
-    if (canvas->window) {
-        canvas = canvas->window;
-    }
-
-    for (unsigned y = y1; y < y2; y++) {
+void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
+                              unsigned h, unsigned long *buf, size_t len) {
+    for (unsigned y = y1; y < y1 + h; y++) {
         struct cell *cell = &canvas->buf[1][y * canvas->w];
-        for (unsigned x = x1; x < x2; x++) {
+        for (unsigned x = x1; x < x1 + w; x++, buf++, cell++) {
             struct cell new_cell = canvas->style;
             new_cell.code_point = *buf;
-
             *cell = new_cell;
-
-            buf++, cell++;
         }
     }
 
@@ -200,61 +171,19 @@ void canvas_put(struct canvas *canvas, unsigned x, unsigned y, unsigned long c) 
     assert(x < canvas->w);
     assert(y < canvas->h);
 
-    x += canvas->x1, y += canvas->x1;
-
-    struct canvas *window = canvas;
-    if (canvas->window) {
-        canvas = canvas->window;
-    }
-
     struct cell new_cell = canvas->style;
     new_cell.code_point = c;
-
     canvas->buf[1][x + y * canvas->w] = new_cell;
 
     canvas->flush_index = 0;
 }
 
 unsigned long canvas_get(struct canvas *canvas, unsigned x, unsigned y) {
-    x += canvas->x1, y += canvas->x1;
-
-    struct canvas *window = canvas;
-    if (canvas->window) {
-        canvas = canvas->window;
-    }
-
     return canvas->buf[1][x + y * canvas->w].code_point;
-}
-
-void canvas_create_window(struct canvas *canvas, unsigned x1, unsigned y1,
-                          unsigned w, unsigned h, struct canvas *window) {
-    // Don't create a window of a window, but rather a different window of the
-    // original canvas
-    if (canvas->window) {
-        canvas = canvas->window;
-    }
-
-    window->buf[0] = window->buf[1] = NULL;
-    window->w = w;
-    window->h = h;
-
-    window->flush_index = 0;
-
-    window->window = canvas;
-    window->x1 = x1, window->y1 = y1;
-
-    VALIDATE_WINDOW(window);
 }
 
 void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol) {
-    x += canvas->x1, y += canvas->y1;
-
-    struct canvas *window = canvas;
-    if (canvas->window) {
-        canvas = canvas->window;
-    }
-
     assert(x + w <= canvas->w);
     assert(y + h <= canvas->h);
 
