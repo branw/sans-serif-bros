@@ -4,24 +4,26 @@
 #include "session.h"
 
 #ifdef __linux__
+#ifndef SOCKET
 typedef int SOCKET;
+#endif
 #endif
 
 struct server {
-    SOCKET listen_sock;
+    SOCKET socket;
+
+    size_t num_sessions;
     struct session *sessions;
-    int num_sessions;
-    int total_sessions;
 };
 
-bool server_create(struct server *server);
+bool server_create(struct server *server, char *service);
 
-void server_accept_session(struct server *server);
+void server_destroy(struct server *server);
 
-bool server_next_session(struct server *server, struct session **sess);
+bool server_update(struct server *server);
 
-void server_disconnect_session(struct server *server, struct session *sess);
+void server_disconnect_session(struct server *server, struct session *session);
 
-void server_run(struct server *server);
+bool server_next_session(struct server *server, struct session **session);
 
 #endif //SSB_SERVER_H

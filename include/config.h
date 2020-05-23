@@ -7,9 +7,9 @@
 #define ROWS 25
 
 // Show incoming messages
-#define DEBUG_INCOMING 0
+#define DEBUG_INCOMING 1
 // Show outgoing messages
-#define DEBUG_OUTGOING 0
+#define DEBUG_OUTGOING 1
 
 // Maximum number of concurrent sessions
 #define MAX_SESSIONS 2

@@ -5,7 +5,7 @@
 #include "canvas.h"
 #include "util.h"
 
-void canvas_init(struct canvas *canvas, unsigned w, unsigned h) {
+void canvas_create(struct canvas *canvas, unsigned w, unsigned h) {
     // Allocate the two buffers
     canvas->buf[0] = calloc(w * h, sizeof(struct cell));
     canvas->buf[1] = calloc(w * h, sizeof(struct cell));
@@ -31,7 +31,7 @@ void canvas_init(struct canvas *canvas, unsigned w, unsigned h) {
     }
 }
 
-void canvas_free(struct canvas *canvas) {
+void canvas_destroy(struct canvas *canvas) {
     free(canvas->buf[0]);
     free(canvas->buf[1]);
 }
@@ -43,7 +43,7 @@ void canvas_resize(struct canvas *canvas, unsigned w, unsigned h) {
 
     // Copy the existing canvas and initialize a new one
     struct canvas old = *canvas;
-    canvas_init(canvas, w, h);
+    canvas_create(canvas, w, h);
 
     // Copy the existing second buffer over
     unsigned copy_w = (old.w > w) ? w : old.w, copy_h = (old.h > h) ? h : old.h;
@@ -52,7 +52,7 @@ void canvas_resize(struct canvas *canvas, unsigned w, unsigned h) {
     }
 
     // Free the existing canvas
-    canvas_free(&old);
+    canvas_destroy(&old);
 }
 
 void canvas_erase(struct canvas *canvas) {

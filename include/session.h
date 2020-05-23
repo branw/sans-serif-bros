@@ -14,18 +14,20 @@ typedef int SOCKET;
 #include "state.h"
 
 struct session {
-    SOCKET client_sock;
-    struct state state;
+    SOCKET socket;
 
-    int id;
+    struct state *state;
+
     struct session *prev;
     struct session *next;
 };
 
-bool session_create(struct session *sess, SOCKET client_sock);
+bool session_create(struct session *session, SOCKET socket);
 
-void session_shutdown(struct session *sess);
+void session_destroy(struct session *session);
 
-bool session_update(struct session *sess);
+bool session_receive(struct session *session, char *buf, size_t len, size_t *len_written);
+
+void session_send(struct session *session, char *buf, size_t len);
 
 #endif //SSB_SESSION_H

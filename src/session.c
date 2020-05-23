@@ -3,6 +3,10 @@
 
 #include <ws2tcpip.h>
 
+#define ERR_NUM (WSAGetLastError())
+#define GET_ERR_MSG(msg) char (msg)[256]; FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | \
+    FORMAT_MESSAGE_IGNORE_INSERTS, NULL, ERR_NUM, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), \
+    (msg), 256, NULL)
 #endif
 
 #ifdef __linux
@@ -12,6 +16,8 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define SOCKET_ERROR -1
 #define INVALID_SOCKET -1
@@ -21,95 +27,97 @@
 static int WSAGetLastError() {
     return errno;
 }
+
+#define ERR_NUM errno
+#define GET_ERR_MSG(msg) char *(msg) = strerror(errno)
 #endif
 
-#include <unistd.h>
 #include <stdio.h>
 
 #include "session.h"
 
-bool session_create(struct session *sess, SOCKET client_sock) {
-    sess->client_sock = client_sock;
+bool session_create(struct session *session, SOCKET socket) {
+    session->socket = socket;
 
-    struct sockaddr_in info = {0};
-    unsigned info_size = sizeof(info);
-    getpeername(client_sock, (struct sockaddr *) &info, &info_size);
+    session->state = malloc(sizeof(struct state));
+    state_create(session->state);
 
-    // Get client IP address
-    char ip[16];
-    inet_ntop(AF_INET, &info.sin_addr, ip, 16);
-
-    printf("#%d connected (%s)\n", sess->id, ip);
-
-    // Use non-blocking mode
+    // Enable non-blocking mode
     u_long mode = 1;
-#ifdef _WIN32
-    ioctlsocket(client_sock, FIONBIO, &mode);
+#if defined(_WIN32)
+    ioctlsocket(session->socket, FIONBIO, &mode);
+#elif defined(__linux__) || defined(__APPLE__)
+    ioctl(session->socket, FIONBIO, &mode);
 #endif
-#ifdef __linux__
-    ioctl(client_sock, FIONBIO, &mode);
-#endif
-
-    // Initialize the game state
-    state_init(sess);
 
     return true;
 }
 
-void session_shutdown(struct session *sess) {
-    printf("#%d disconnected\n", sess->id);
+void session_destroy(struct session *session) {
+    state_destroy(session->state);
+    free(session->state);
 
-    // Disable sending to the socket
-#ifdef _WIN32
-    int res = shutdown(sess->client_sock, SD_SEND);
+    // Prevent anymore sending on the socket
+#if defined(_WIN32)
+    int result = shutdown(session->socket, SD_SEND);
+#elif defined(__linux__) || defined(__APPLE__)
+    int result = shutdown(session->socket, SHUT_WR);
 #endif
-#ifdef __linux__
-    int res = shutdown(sess->client_sock, SHUT_WR);
-#endif
-    if (res == SOCKET_ERROR) {
-        fprintf(stderr, "#%d: shutdown failed (%d)\n", sess->id, WSAGetLastError());
+    if (result == -1) {
+        GET_ERR_MSG(err_msg);
+        fprintf(stderr, "shutdown failed (%d: %s)\n", ERR_NUM, err_msg);
     }
 
-#ifdef _WIN32
-    closesocket(sess->client_sock);
-#endif
-#ifdef __linux
-    close(sess->client_sock);
+    // Close the socket
+#if defined(_WIN32)
+    closesocket(session->socket);
+#elif defined(__linux__) || defined(__APPLE__)
+    close(session->socket);
 #endif
 }
 
-#define RECV_BUF_LEN 512
-
-static bool handle_input(struct session *sess) {
-    char recv_buf[RECV_BUF_LEN];
-
-    // Receive a packet from the client
-    int recv_len = recv(sess->client_sock, recv_buf, RECV_BUF_LEN, 0);
-    if (recv_len == SOCKET_ERROR) {
-        int err = WSAGetLastError();
-        // There's nothing to receive
-        if (err == WSAEWOULDBLOCK) {
+bool session_receive(struct session *session, char *buf, size_t len, size_t *len_written) {
+    ssize_t recv_len = recv(session->socket, buf, (int) len, 0);
+    // An error occurred while receiving
+    if (recv_len == -1) {
+        // Nothing was transmitted since the last receive
+#if defined(_WIN32)
+        if (ERR_NUM == WSAEWOULDBLOCK) {
+#elif defined(__linux__) || defined(__APPLE__)
+        if (ERR_NUM == EWOULDBLOCK) {
+#endif
+            *len_written = 0;
             return true;
         }
-            // An actual error occurred
-        else {
-            fprintf(stderr, "#%d: recv failed (%d)\n", sess->id, err);
-            return false;
-        }
-    }
 
+        GET_ERR_MSG(err_msg);
+        fprintf(stderr, "recv failed (%d: %s)\n", ERR_NUM, err_msg);
+        return false;
+    }
     // The client disconnected
-    if (recv_len == 0) {
+    else if (recv_len == 0) {
         return false;
     }
 
-    // Parse the input
-    terminal_recv(sess, recv_buf, recv_len);
+    printf("-> ");
+    for (ssize_t i = 0; i < recv_len; ++i) {
+        printf("%02x ", (unsigned char) buf[i]);
+    }
+    printf("\n");
 
+    *len_written = (size_t) recv_len;
     return true;
 }
 
-bool session_update(struct session *sess) {
-    // Process input and execute the current state
-    return handle_input(sess) && state_update(sess);
+void session_send(struct session *session, char *buf, size_t len) {
+    if (send(session->socket, buf, (int) len, 0) == -1) {
+        GET_ERR_MSG(err_msg);
+        fprintf(stderr, "send failed (%d: %s)\n", ERR_NUM, err_msg);
+    }
+
+    printf("<- ");
+    for (int i = 0; i < len; ++i) {
+        printf("%02x ", (unsigned char) buf[i]);
+    }
+    printf("\n");
 }

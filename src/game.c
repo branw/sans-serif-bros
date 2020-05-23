@@ -500,7 +500,9 @@ static void process_frame_8(struct game_state *state) {
     }
 }
 
-void game_update(struct game_state *state) {
+void game_update(struct game_state *state, struct menu_input *input) {
+    state->input = *input;
+
     if (state->win || state->die) {
         return;
     }

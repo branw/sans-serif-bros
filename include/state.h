@@ -1,32 +1,33 @@
 #ifndef SSB_STATE_H
 #define SSB_STATE_H
 
-#include <stdbool.h>
 #include <time.h>
+#include <stdbool.h>
 
-#include "terminal.h"
-#include "game.h"
 #include "canvas.h"
+#include "terminal.h"
 
 enum screen {
-    title_screen, game_screen
+    init_screen, title_screen
 };
 
 struct state {
-    struct timespec last_tick;
+    struct canvas canvas;
+    struct terminal terminal;
+
     enum screen screen;
 
-    struct canvas canvas;
-
-    struct terminal_state terminal_state;
-
-    struct game_state game_state;
+    long long tick_ms;
+    struct timespec last_tick;
+    size_t num_ticks;
 };
 
-struct session;
+struct db;
 
-void state_init(struct session *sess);
+bool state_create(struct state *state);
 
-bool state_update(struct session *sess);
+void state_destroy(struct state *state);
+
+bool state_update(struct state *state, struct db *db);
 
 #endif //SSB_STATE_H

@@ -19,6 +19,6 @@ struct game_state {
 
 void game_init(struct game_state *state);
 
-void game_update(struct game_state *state);
+void game_update(struct game_state *state, struct menu_input *input);
 
 #endif //SSB_GAME_H

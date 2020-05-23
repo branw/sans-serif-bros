@@ -47,9 +47,9 @@ struct canvas {
     size_t flush_last_index;
 };
 
-void canvas_init(struct canvas *canvas, unsigned w, unsigned h);
+void canvas_create(struct canvas *canvas, unsigned w, unsigned h);
 
-void canvas_free(struct canvas *canvas);
+void canvas_destroy(struct canvas *canvas);
 
 void canvas_resize(struct canvas *canvas, unsigned w, unsigned h);
 

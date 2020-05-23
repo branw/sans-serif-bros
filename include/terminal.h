@@ -3,9 +3,13 @@
 
 #include <stdbool.h>
 
+#define ESC "\x1b"
+
 #define ECHO "\x01"
 #define SUPPRESS_GO_AHEAD "\x03"
 #define NAWS "\x1f"
+
+#define CSI ESC "["
 
 #define IAC  "\xff"
 #define DONT "\xfe"
@@ -25,6 +29,48 @@
 #define SE   "\xf0"
 #define EOR  "\xef"
 
+struct menu_input {
+    bool esc, enter, space;
+    int x, y;
+};
+
+struct terminal {
+    struct canvas *canvas;
+
+    struct menu_input input;
+
+    char buffer[4096];
+    int buffer_len, buffer_flushed_len;
+};
+
+
+// Create a new terminal instance
+bool terminal_create(struct terminal *terminal, struct canvas *canvas);
+
+// Destroy an existing terminal instance
+void terminal_destroy(struct terminal *terminal);
+
+void terminal_parse(struct terminal *terminal, char *buf, size_t len);
+
+bool terminal_flush(struct terminal *terminal, char *buf, size_t len,
+                    size_t *len_written);
+
+void terminal_write_bytes(struct terminal *terminal, char *buf, size_t len);
+
+void terminal_write(struct terminal *terminal, char *buf);
+
+
+void terminal_reset(struct terminal *terminal);
+
+void terminal_clear(struct terminal *terminal);
+
+void terminal_move(struct terminal *terminal, unsigned x, unsigned y);
+
+void terminal_cursor(struct terminal *terminal, bool state);
+
+
+
+/*
 struct session;
 
 // Number of bytes to store for each session; must be a power of 2
@@ -81,5 +127,6 @@ struct menu_input {
 void terminal_read_menu_input(struct session *sess, struct menu_input *input);
 
 bool terminal_dimensions(struct session *sess, unsigned *w, unsigned *h);
+*/
 
 #endif //SSB_TERMINAL_H
