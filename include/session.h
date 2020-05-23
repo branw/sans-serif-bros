@@ -1,20 +1,10 @@
 #ifndef SSB_SESSION_H
 #define SSB_SESSION_H
 
-#ifdef _WIN32
-#include <Winsock2.h>
-#include <stdbool.h>
-
-#endif
-
-#ifdef __linux__
-typedef int SOCKET;
-#endif
-
 #include "state.h"
 
 struct session {
-    SOCKET socket;
+    int socket;
 
     struct state *state;
 
@@ -22,7 +12,7 @@ struct session {
     struct session *next;
 };
 
-bool session_create(struct session *session, SOCKET socket);
+bool session_create(struct session *session, int socket);
 
 void session_destroy(struct session *session);
 

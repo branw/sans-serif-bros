@@ -3,7 +3,6 @@
 
 #include <time.h>
 #include <stdbool.h>
-
 #include "canvas.h"
 #include "terminal.h"
 

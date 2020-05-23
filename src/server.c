@@ -1,66 +1,15 @@
-#ifdef _WIN32
-#define _WIN32_WINNT _WIN32_WINNT_WIN8
-
-#include <Winsock2.h>
-#include <ws2tcpip.h>
-#define ERR_NUM (WSAGetLastError())
-#define GET_ERR_MSG(msg) char (msg)[256]; FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | \
-    FORMAT_MESSAGE_IGNORE_INSERTS, NULL, ERR_NUM, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), \
-    (msg), 256, NULL)
-#endif
-
-#ifdef __linux__
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/select.h>
 #include <netdb.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
-
-#define SOCKET_ERROR -1
-#define INVALID_SOCKET -1
-
-static int WSAGetLastError() {
-    return errno;
-}
-
-#define ERR_NUM errno
-#define GET_ERR_MSG(msg) char *(msg) = strerror(errno)
-#endif
-
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-
 #include "server.h"
 
-#if defined(_WIN32)
-static void cleanup_wsa(void) {
-    WSACleanup();
-}
-#endif
-
 bool server_create(struct server *server, char *service) {
-#if defined(_WIN32)
-    // Initialize WSA
-    static bool wsa_initialized = false;
-    if (!wsa_initialized) {
-        WSADATA wsa_data;
-
-        int result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-        if (result) {
-            fprintf(stderr, "WSAStartup failed (%d)\n", result);
-            return false;
-        }
-
-        // Unload the WSA module when we exit
-        atexit(cleanup_wsa);
-
-        wsa_initialized = true;
-    }
-#endif
-
     struct addrinfo *addr = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_INET;
@@ -76,10 +25,9 @@ bool server_create(struct server *server, char *service) {
     }
 
     // Create a new socket
-    SOCKET sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-    if (sock == (SOCKET) -1) {
-        GET_ERR_MSG(err_msg);
-        fprintf(stderr, "socket failed (%d: %s)\n", ERR_NUM, err_msg);
+    int sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+    if (sock == -1) {
+        fprintf(stderr, "socket failed (%d: %s)\n", errno, strerror(errno));
         freeaddrinfo(addr);
         return false;
     }
@@ -88,15 +36,13 @@ bool server_create(struct server *server, char *service) {
     result = bind(sock, addr->ai_addr, (int) addr->ai_addrlen);
     freeaddrinfo(addr);
     if (result == -1) {
-        GET_ERR_MSG(err_msg);
-        fprintf(stderr, "bind failed (%d: %s)\n", ERR_NUM, err_msg);
+        fprintf(stderr, "bind failed (%d: %s)\n", errno, strerror(errno));
         goto failure;
     }
 
     result = listen(sock, SOMAXCONN);
     if (result == -1) {
-        GET_ERR_MSG(err_msg);
-        fprintf(stderr, "listen failed (%d: %s)\n", ERR_NUM, err_msg);
+        fprintf(stderr, "listen failed (%d: %s)\n", errno, strerror(errno));
         goto failure;
     }
 
@@ -108,11 +54,7 @@ bool server_create(struct server *server, char *service) {
     return true;
 
     failure:
-#if defined(_WIN32)
-    closesocket(sock);
-#elif defined(__linux__) || defined(__APPLE__)
     close(sock);
-#endif
     return false;
 }
 
@@ -125,22 +67,13 @@ void server_destroy(struct server *server) {
     }
 
     // Prevent anymore sending on the socket
-#if defined(_WIN32)
-    int result = shutdown(server->socket, SD_SEND);
-#elif defined(__linux__) || defined(__APPLE__)
     int result = shutdown(server->socket, SHUT_WR);
-#endif
     if (result == -1) {
-        GET_ERR_MSG(err_msg);
-        fprintf(stderr, "shutdown failed (%d: %s)\n", ERR_NUM, err_msg);
+        fprintf(stderr, "shutdown failed (%d: %s)\n", errno, strerror(errno));
     }
 
     // Close the socket
-#if defined(_WIN32)
-    closesocket(server->socket);
-#elif defined(__linux__) || defined(__APPLE__)
     close(server->socket);
-#endif
 }
 
 bool server_update(struct server *server) {
@@ -154,8 +87,7 @@ bool server_update(struct server *server) {
 
     int result = select(FD_SETSIZE, &read_set, NULL, NULL, &timeout);
     if (result == -1) {
-        GET_ERR_MSG(err_msg);
-        fprintf(stderr, "select failed (%d: %s)\n", ERR_NUM, err_msg);
+        fprintf(stderr, "select failed (%d: %s)\n", errno, strerror(errno));
         return false;
     }
     // There aren't any new connections
@@ -164,10 +96,9 @@ bool server_update(struct server *server) {
     }
 
     // Accept the new connection
-    SOCKET sock = accept(server->socket, NULL, NULL);
-    if (sock == (SOCKET) -1) {
-        GET_ERR_MSG(err_msg);
-        fprintf(stderr, "accept failed (%d: %s)\n", ERR_NUM, err_msg);
+    int sock = accept(server->socket, NULL, NULL);
+    if (sock == -1) {
+        fprintf(stderr, "accept failed (%d: %s)\n", errno, strerror(errno));
         return false;
     }
 

@@ -3,14 +3,8 @@
 
 #include "session.h"
 
-#ifdef __linux__
-#ifndef SOCKET
-typedef int SOCKET;
-#endif
-#endif
-
 struct server {
-    SOCKET socket;
+    int socket;
 
     size_t num_sessions;
     struct session *sessions;
