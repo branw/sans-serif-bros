@@ -29,4 +29,6 @@ if (WIN32)
 link_libraries(ws2_32 wsock32)
 endif ()
 
-add_executable(ssb main.c server.c server.h session.c session.h state.c state.h terminal.c terminal.h config.h game.c game.h util.c util.h canvas.c canvas.h)
+add_executable(ssb
+        src/main.c src/server.c src/session.c src/state.c src/terminal.c src/game.c src/util.c src/canvas.c)
+target_include_directories(ssb PUBLIC include)

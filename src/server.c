@@ -53,7 +53,7 @@ bool server_create(struct server *server) {
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve a Telnet address
-    int res = getaddrinfo(NULL, "telnet", &hints, &addr);
+    int res = getaddrinfo(NULL, "8080", &hints, &addr);
     if (res) {
         fprintf(stderr, "getaddrinfo failed (%d)\n", res);
         return false;

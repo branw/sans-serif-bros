@@ -23,6 +23,7 @@ static int WSAGetLastError() {
 }
 #endif
 
+#include <unistd.h>
 #include <stdio.h>
 
 #include "session.h"
@@ -31,7 +32,7 @@ bool session_create(struct session *sess, SOCKET client_sock) {
     sess->client_sock = client_sock;
 
     struct sockaddr_in info = {0};
-    int info_size = sizeof(info);
+    unsigned info_size = sizeof(info);
     getpeername(client_sock, (struct sockaddr *) &info, &info_size);
 
     // Get client IP address
@@ -51,6 +52,8 @@ bool session_create(struct session *sess, SOCKET client_sock) {
 
     // Initialize the game state
     state_init(sess);
+
+    return true;
 }
 
 void session_shutdown(struct session *sess) {
