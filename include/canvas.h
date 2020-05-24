@@ -25,6 +25,9 @@ struct cell {
     uint32_t bold : 1;
 };
 
+_Static_assert(sizeof(struct cell) == sizeof(uint32_t),
+        "Canvas cell should fit in 32 bits");
+
 // Zero out a cell
 #define CANVAS_CELL_CLEAR(cell) do { (cell).code_point = 0; (cell).italic = false; \
         (cell).underline = false; (cell).blink = false; (cell).foreground = black; \

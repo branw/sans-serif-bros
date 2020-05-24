@@ -100,9 +100,7 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 
         canvas->flush_last_index = index;
 
-        //TODO allow for split escape sequences
 
-        //TODO parse state and emit escape sequences
 
         // Now try to emit the actual character
         size_t encoded_len = utf8_encode(canvas->flush_encode_offset, &buf, remaining,

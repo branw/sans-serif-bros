@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 project(ssb C)
 
 # Hey, I like to declare my variables inside my for loops!
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 
 # Get last commit hash
 execute_process(
@@ -24,12 +24,8 @@ execute_process(
 add_definitions(-DGIT_COMMIT_HASH="${GIT_COMMIT_HASH}")
 add_definitions(-DGIT_COMMIT_TIMESTAMP="${GIT_COMMIT_TIMESTAMP}")
 
-if (WIN32)
-# Link Winsock libraries
-link_libraries(ws2_32 wsock32)
-endif ()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -O0 -fno-omit-frame-pointer -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fsanitize=undefined -O0 -fno-omit-frame-pointer -g")
 
 add_executable(ssb
         src/main.c src/server.c src/session.c src/state.c src/terminal.c src/game.c src/util.c src/canvas.c src/db.c)
