@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "terminal.h"
 #include "session.h"
+#include "telnet.h"
 
 bool terminal_create(struct terminal *terminal, struct canvas *canvas) {
     terminal->canvas = canvas;

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "state.h"
 #include "db.h"
+#include "telnet.h"
 
 /*
  * Specific state handlers

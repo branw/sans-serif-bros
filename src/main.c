@@ -1,11 +1,37 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
 #include "db.h"
 #include "server.h"
 
 #define USAGE "usage: ssb [-hvs] [-d path/to/db] [-p port]\n"
 #define VERSION GIT_COMMIT_HASH
+
+struct termios orig_termios;
+
+void exit_raw_mode(void) {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enter_raw_mode(void) {
+    tcgetattr(STDIN_FILENO, &orig_termios);
+
+    struct termios raw = orig_termios;
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN);
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+void disable_blocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
 
 int main(int argc, char *argv[]) {
     char *port = NULL, *db_path = NULL;
@@ -13,7 +39,7 @@ int main(int argc, char *argv[]) {
 
     // Parse command-line arguments
     int opt;
-    while ((opt = getopt(argc, argv, "hvp:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvdp:s")) != -1) {
         switch (opt) {
             case 'd': {
                 db_path = optarg;
@@ -61,16 +87,43 @@ int main(int argc, char *argv[]) {
     }
 
     if (standalone) {
-        /*
+        // Disable terminal processing and receive raw ANSI sequences like with Telnet
+        enter_raw_mode();
+        atexit(exit_raw_mode);
+
+        // Don't block on reads to stdin
+        disable_blocking(STDIN_FILENO);
+
         struct state state;
-        while (state_update(&db, &state)) {
+        state_create(&state);
 
+        bool running = true;
+        while (running) {
+            char buf[512];
+            ssize_t read_len;
+            while ((read_len = read(STDIN_FILENO, buf, 512)) > 0) {
+                //printf("got %ld\n", read_len);
+                terminal_parse(&state.terminal, buf, read_len);
+            }
+
+            if (state_update(&state, &db)) {
+                // Flush and send output data
+                size_t write_len;
+                while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
+                    //printf("put %ld\n", write_len);
+                    write(STDOUT_FILENO, buf, write_len);
+                }
+            }
+            else {
+                running = false;
+            }
         }
-         */
 
-        fprintf(stderr, "Unimplemented\n");
+        printf("Shutting down...\n");
 
-        goto failure;
+        db_destroy(&db);
+
+        return EXIT_SUCCESS;
     }
 
     // Launch the server
