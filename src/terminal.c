@@ -16,7 +16,32 @@ void terminal_destroy(struct terminal *terminal) {
 }
 
 void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
-    //TODO
+    while (len) {
+        char ch = *buf;
+
+        // Escape sequences
+        if (ch == '\x1b' && len >= 2) {
+            // CSI sequences
+            if (buf[1] == '[' && len >= 3) {
+                // Move cursor
+                if (buf[2] >= 'A' && buf[2] <= 'D') {
+                    if (buf[2] == 'A' || buf[2] == 'B') {
+                        terminal->input.y = (buf[2] == 'A') ? 1 : -1;
+                    }
+                    else if (buf[2] == 'C' || buf[2] == 'D') {
+                        terminal->input.x = (buf[2] == 'C') ? 1 : -1;
+                    }
+
+                    buf += 3;
+                    len -= 3;
+                    continue;
+                }
+            }
+        }
+
+        buf++;
+        len--;
+    }
 }
 
 bool terminal_flush(struct terminal *terminal, char *buf, size_t len, size_t *len_written) {

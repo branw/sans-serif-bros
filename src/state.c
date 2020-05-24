@@ -26,8 +26,6 @@ static void init_screen_update(struct state *state) {
 }
 
 static bool title_screen_update(struct state *state, struct db *db) {
-    //TODO send telnet config
-
     struct level *level;
     if (!db_get_level(db, 1, &level)) {
         printf("failed to get level!\n");
@@ -42,9 +40,14 @@ static bool title_screen_update(struct state *state, struct db *db) {
 }
 
 static bool game_screen_update(struct state *state) {
+    game_update(&state->game, &state->terminal.input);
 
-    struct menu_input input = {0};
-    game_update(&state->game, &input);
+    state->terminal.input.x = state->terminal.input.y = 0;
+
+    if (state->game.win) {
+        canvas_foreground(&state->canvas, white);
+        canvas_background(&state->canvas, green);
+    }
 
     canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
                              (uint32_t *) state->game.field, ROWS * COLUMNS);
