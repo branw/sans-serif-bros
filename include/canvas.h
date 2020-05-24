@@ -2,6 +2,7 @@
 #define SSB_CANVAS_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 enum color {
     black,
@@ -15,13 +16,13 @@ enum color {
 };
 
 struct cell {
-    unsigned long code_point : 21;
-    unsigned long italic : 1;
-    unsigned long underline : 1;
-    unsigned long blink : 1;
+    uint32_t code_point : 21;
+    uint32_t italic : 1;
+    uint32_t underline : 1;
+    uint32_t blink : 1;
     enum color foreground : 3;
     enum color background : 3;
-    unsigned long bold : 1;
+    uint32_t bold : 1;
 };
 
 // Zero out a cell
@@ -60,7 +61,7 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 bool canvas_forced_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_written);
 
 void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
-                              unsigned h, unsigned long *buf, size_t len);
+                              unsigned h, uint32_t *buf, size_t len);
 
 void canvas_put(struct canvas *canvas, unsigned x, unsigned y, unsigned long c);
 

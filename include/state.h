@@ -5,9 +5,10 @@
 #include <stdbool.h>
 #include "canvas.h"
 #include "terminal.h"
+#include "game.h"
 
 enum screen {
-    init_screen, title_screen
+    init_screen, title_screen, game_screen,
 };
 
 struct state {
@@ -19,6 +20,8 @@ struct state {
     long long tick_ms;
     struct timespec last_tick;
     size_t num_ticks;
+
+    struct game game;
 };
 
 struct db;

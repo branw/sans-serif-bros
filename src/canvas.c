@@ -153,7 +153,7 @@ void canvas_write_utf8(struct canvas *canvas, unsigned x, unsigned y, char *msg)
 }
 
 void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
-                              unsigned h, unsigned long *buf, size_t len) {
+                              unsigned h, uint32_t *buf, size_t len) {
     for (unsigned y = y1; y < y1 + h; y++) {
         struct cell *cell = &canvas->buf[1][x1 + y * canvas->w];
         for (unsigned x = x1; x < x1 + w; x++, buf++, cell++) {

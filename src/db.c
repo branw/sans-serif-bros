@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include <stdint.h>
 #include "db.h"
+#include "util.h"
 
 /*
  * Internal AVL tree used to store level data
@@ -39,11 +40,13 @@ static void tree_create(struct node **root) {
 
 // Destruct a tree and destroy all of its nodes
 static void tree_destroy(struct node **root) {
-    if (*root) {
-        //TODO free all nodes
-
-        node_destroy(root);
+    if ((*root)->left) {
+        tree_destroy(&(*root)->left);
     }
+    if ((*root)->right) {
+        tree_destroy(&(*root)->right);
+    }
+    node_destroy(root);
 }
 
 // Rotate the tree left
@@ -441,9 +444,45 @@ static bool load_level(struct db *db, struct level *level) {
 
     // For convenience, we store levels in a text editor-friendly manner:
     // encoded in UTF-8 with proper line endings. This is where we pay the tax
-    //TODO
+
+    char buffer[8096] = {0};
+    fread(buffer, sizeof(char), 8096, field_file);
+
+    level->field = calloc(80 * 25, sizeof(uint32_t));
+
+    char *p = buffer;
+    uint32_t *field = level->field;
+    int num_columns = 0, num_rows = 0;
+    while (*p) {
+        uint32_t value = utf8_decode(&p);
+
+        // Ignore carriage returns
+        if (value == 0x0d) continue;
+        else if (value == 0x0a) {
+            if (num_columns != 80) {
+                goto failure;
+            }
+
+            num_rows++;
+            num_columns = 0;
+        }
+        else {
+            *field++ = value;
+            num_columns++;
+        }
+    }
+
+    if (!(num_rows == 25 && num_columns == 0) && !(num_rows == 24 && num_columns == 80)) {
+        goto failure;
+    }
 
     return true;
+
+    failure:
+    free(level->field);
+    level->field = NULL;
+
+    return false;
 }
 
 /*
@@ -452,6 +491,7 @@ static bool load_level(struct db *db, struct level *level) {
 
 bool db_create(struct db *db, char *path) {
     db->path = path;
+    db->num_levels = 0;
 
     tree_create(&db->tree);
 

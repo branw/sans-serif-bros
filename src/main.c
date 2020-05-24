@@ -4,7 +4,7 @@
 #include "db.h"
 #include "server.h"
 
-#define USAGE "usage: ssb [-hv] [-d path/to/db] [-p port]\n"
+#define USAGE "usage: ssb [-hvs] [-d path/to/db] [-p port]\n"
 #define VERSION GIT_COMMIT_HASH
 
 int main(int argc, char *argv[]) {
@@ -60,7 +60,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-
     if (standalone) {
         /*
         struct state state;
@@ -70,14 +69,16 @@ int main(int argc, char *argv[]) {
          */
 
         fprintf(stderr, "Unimplemented\n");
-        return EXIT_FAILURE;
+
+        goto failure;
     }
 
     // Launch the server
     struct server server;
     if (!server_create(&server, port ? port : "telnet")) {
         fprintf(stderr, "failed to create server\n");
-        return EXIT_FAILURE;
+
+        goto failure;
     }
 
     // Accept new connections and update existing ones
@@ -111,7 +112,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    printf("Shutting down...\n");
+
     server_destroy(&server);
+    db_destroy(&db);
 
     return EXIT_SUCCESS;
+
+    failure:
+    db_destroy(&db);
+
+    return EXIT_FAILURE;
 }

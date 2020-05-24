@@ -10,46 +10,27 @@
 #define LEFT (state->input.x < 0)
 #define RIGHT (state->input.x > 0)
 
-void game_init(struct game_state *state) {
-    state->tick = 0;
-    state->win = state->die = state->no_money_left = false;
-    state->tired = 0;
 
-    char *stage =
-            "################################################################################"
-            "///                                                                             "
-            "//                                                                              "
-            "/                                                                               "
-            "                                                                                "
-            "                                              ##                                "
-            "                                             ####                               "
-            "                                             ####                               "
-            "                                              ##                                "
-            "                                              ##                                "
-            "       ##                                     ##                                "
-            "      ####             e             \xc2\xa3   \xc2\xa3    ##                       "
-            "         "
-            "      ####           ###########################                                "
-            "       ##           ###         #                                               "
-            "       ##   I      ####         #                                               "
-            "       ##########################                                               "
-            "                                                                                "
-            "                                                                                "
-            "                                                                                "
-            "                                                                                "
-            "                                                                                "
-            "                                                                               /"
-            "                                                                              //"
-            "                                                                             ///"
-            "################################################################################";
+void game_create(struct game *game, uint32_t *stage) {
+    game->tick = 0;
+    game->win = game->die = game->no_money_left = false;
+    game->tired = 0;
 
-    unsigned long *field = (unsigned long *) (state->field);
+    memcpy(game->field, stage, ROWS * COLUMNS * sizeof(uint32_t));
+}
+
+void game_create_from_utf8(struct game *game, char *stage) {
+    game->tick = 0;
+    game->win = game->die = game->no_money_left = false;
+    game->tired = 0;
+
+    unsigned long *field = (unsigned long *) game->field;
     while (*stage) {
         *field++ = utf8_decode(&stage);
     }
 }
 
-static void replace(struct game_state *state, unsigned long from, unsigned long to) {
+static void replace(struct game *state, unsigned long from, unsigned long to) {
     for (unsigned y = 0; y < ROWS; ++y) {
         for (unsigned x = 0; x < COLUMNS; ++x) {
             if (state->field[y][x] == from) {
@@ -59,7 +40,7 @@ static void replace(struct game_state *state, unsigned long from, unsigned long 
     }
 }
 
-static void swap(struct game_state *state, unsigned long a, unsigned long b) {
+static void swap(struct game *state, unsigned long a, unsigned long b) {
     for (unsigned y = 0; y < ROWS; ++y) {
         for (unsigned x = 0; x < COLUMNS; ++x) {
             if (state->field[y][x] == a) {
@@ -73,7 +54,7 @@ static void swap(struct game_state *state, unsigned long a, unsigned long b) {
     }
 }
 
-static bool probe(struct game_state *state, unsigned x, unsigned y, unsigned long ch) {
+static bool probe(struct game *state, unsigned x, unsigned y, unsigned long ch) {
     if (y >= ROWS || x >= COLUMNS) {
         return true;
     }
@@ -173,7 +154,7 @@ static bool probe(struct game_state *state, unsigned x, unsigned y, unsigned lon
     return !(ob == ' ' && next_ob == ' ');
 }
 
-static void process_frame_1(struct game_state *state) {
+static void process_frame_1(struct game *state) {
     int money_left = 0;
     int players_left = 0;
 
@@ -464,7 +445,7 @@ static void process_frame_1(struct game_state *state) {
     }
 }
 
-static void process_frame_8(struct game_state *state) {
+static void process_frame_8(struct game *state) {
     for (unsigned y = 0; y < ROWS; ++y) {
         for (unsigned x = 0; x < COLUMNS; ++x) {
             unsigned long ch = state->field[y][x];
@@ -500,34 +481,34 @@ static void process_frame_8(struct game_state *state) {
     }
 }
 
-void game_update(struct game_state *state, struct menu_input *input) {
-    state->input = *input;
+void game_update(struct game *game, struct menu_input *input) {
+    game->input = *input;
 
-    if (state->win || state->die) {
+    if (game->win || game->die) {
         return;
     }
 
-    memcpy(state->next_field, state->field, sizeof(unsigned long) * ROWS * COLUMNS);
+    memcpy(game->next_field, game->field, ROWS * COLUMNS * sizeof(uint32_t));
 
-    if (state->reverse) {
-        swap(state, '{', '}');
-        swap(state, '[', ']');
-        swap(state, '<', '>');
-        swap(state, '(', ')');
-        state->reverse = false;
+    if (game->reverse) {
+        swap(game, '{', '}');
+        swap(game, '[', ']');
+        swap(game, '<', '>');
+        swap(game, '(', ')');
+        game->reverse = false;
     }
 
-    process_frame_1(state);
-    if (state->tick++ % 8 == 7) {
-        process_frame_8(state);
+    process_frame_1(game);
+    if (game->tick++ % 8 == 7) {
+        process_frame_8(game);
     }
 
-    memcpy(state->field, state->next_field, sizeof(unsigned long) * ROWS * COLUMNS);
+    memcpy(game->field, game->next_field, ROWS * COLUMNS * sizeof(uint32_t));
 
-    if (state->tired) {
-        ++state->tired;
-        if (state->tired > 2) {
-            state->tired = 0;
+    if (game->tired) {
+        ++game->tired;
+        if (game->tired > 2) {
+            game->tired = 0;
         }
     }
 }

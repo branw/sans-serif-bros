@@ -1,6 +1,7 @@
 #include <time.h>
 #include <stdio.h>
 #include "state.h"
+#include "db.h"
 
 /*
  * Specific state handlers
@@ -15,9 +16,6 @@ static void init_screen_update(struct state *state) {
     terminal_write(&state->terminal, IAC WILL SUPPRESS_GO_AHEAD);
     terminal_write(&state->terminal, IAC WILL NAWS);
 
-    // Leave a greeting to describe the game version
-    terminal_write(&state->terminal, "Hello!\n\r");
-
     // Empty the terminal and hide the cursor
     terminal_clear(&state->terminal);
     terminal_move(&state->terminal, 0, 0);
@@ -27,13 +25,29 @@ static void init_screen_update(struct state *state) {
     state->screen = title_screen;
 }
 
-static bool title_screen_update(struct state *state) {
+static bool title_screen_update(struct state *state, struct db *db) {
     //TODO send telnet config
+
+    struct level *level;
+    if (!db_get_level(db, 1, &level)) {
+        printf("failed to get level!\n");
+        return false;
+    }
+
+    game_create(&state->game, level->field);
+
+    state->screen = game_screen;
 
     return true;
 }
 
 static bool game_screen_update(struct state *state) {
+
+    struct menu_input input = {0};
+    game_update(&state->game, &input);
+
+    canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
+                             (uint32_t *) state->game.field, ROWS * COLUMNS);
 
     return true;
 }
@@ -84,7 +98,11 @@ bool state_update(struct state *state, struct db *db) {
         }
 
         case title_screen: {
-            return title_screen_update(state);
+            return title_screen_update(state, db);
+        }
+
+        case game_screen: {
+            return game_screen_update(state);
         }
 
         default: {
