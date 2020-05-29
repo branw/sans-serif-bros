@@ -14,7 +14,7 @@
     ((input).fs & (1 << (key)) == (1 << (key)))
 
 #define KEYBOARD_CLEAR(input) \
-    memset(&input, 0, sizeof(struct keyboard_input))
+    (input) = (struct keyboard_input){0}
 
 struct directional_input {
     int up : 1;

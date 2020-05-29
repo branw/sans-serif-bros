@@ -28,5 +28,5 @@ add_definitions(-DGIT_COMMIT_TIMESTAMP="${GIT_COMMIT_TIMESTAMP}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fsanitize=undefined -O0 -fno-omit-frame-pointer -g")
 
 add_executable(ssb
-        src/main.c src/server.c src/session.c src/state.c src/terminal.c src/game.c src/util.c src/canvas.c src/db.c)
+        src/main.c src/server.c src/session.c src/state.c src/terminal.c src/game.c src/util.c src/canvas.c src/db.c src/screen.c)
 target_include_directories(ssb PUBLIC include)
