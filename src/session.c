@@ -55,7 +55,8 @@ bool session_receive(struct session *session, char *buf, size_t len, size_t *len
 
     printf("-> ");
     for (ssize_t i = 0; i < recv_len; ++i) {
-        printf("%02x ", (unsigned char) buf[i]);
+        if (buf[i] >= 0x20 && buf[i] <= 0x7e) printf("%c", buf[i]);
+        else printf("\\x%02x", (unsigned char) buf[i]);
     }
     printf("\n");
 
@@ -70,7 +71,8 @@ void session_send(struct session *session, char *buf, size_t len) {
 
     printf("<- ");
     for (int i = 0; i < len; ++i) {
-        printf("%02x ", (unsigned char) buf[i]);
+        if (buf[i] >= 0x20 && buf[i] <= 0x7e) printf("%c", buf[i]);
+        else printf("\\x%02x", (unsigned char) buf[i]);
     }
     printf("\n");
 }

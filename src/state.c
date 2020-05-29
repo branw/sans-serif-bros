@@ -41,17 +41,28 @@ static bool title_screen_update(struct state *state, struct db *db) {
 }
 
 static bool game_screen_update(struct state *state) {
-    game_update(&state->game, &state->terminal.input);
+    struct directional_input input;
+    terminal_get_directional_input(&state->terminal, &input, false);
 
-    state->terminal.input.x = state->terminal.input.y = 0;
+    game_update(&state->game, &input);
+
+    KEYBOARD_CLEAR(state->terminal.keyboard);
 
     if (state->game.win) {
-        canvas_foreground(&state->canvas, white);
+        canvas_foreground(&state->canvas, black);
         canvas_background(&state->canvas, green);
+    }
+    else {
+        canvas_foreground(&state->canvas, white);
+        canvas_background(&state->canvas, black);
     }
 
     canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
                              (uint32_t *) state->game.field, ROWS * COLUMNS);
+
+    if (state->num_ticks % 100 == 99) {
+        canvas_force_next_flush(&state->canvas);
+    }
 
     return true;
 }

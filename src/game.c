@@ -5,11 +5,10 @@
 #define MONEY 0xa3
 #define PIPE 0xa6
 
-#define UP (state->input.y > 0)
-#define DOWN (state->input.y < 0)
-#define LEFT (state->input.x < 0)
-#define RIGHT (state->input.x > 0)
-
+#define UP (state->input.up)
+#define DOWN (state->input.down)
+#define LEFT (state->input.left)
+#define RIGHT (state->input.right)
 
 void game_create(struct game *game, uint32_t *stage) {
     game->tick = 0;
@@ -88,7 +87,7 @@ static bool probe(struct game *state, unsigned x, unsigned y, unsigned long ch) 
         }
 
         case 'O': {
-            int d = state->input.x;
+            int d = state->input.left ? -1 : (state->input.right ? 1 : 0);
             if (d != 0 && probe(state, x, y + 1, ob) && !probe(state, x + d, y, ob) &&
                 state->field[y][x - d] == 'I') {
                 state->next_field[y][x + d] = ob;
@@ -481,7 +480,7 @@ static void process_frame_8(struct game *state) {
     }
 }
 
-void game_update(struct game *game, struct menu_input *input) {
+void game_update(struct game *game, struct directional_input *input) {
     game->input = *input;
 
     if (game->win || game->die) {

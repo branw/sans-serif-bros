@@ -15,18 +15,17 @@ void canvas_create(struct canvas *canvas, unsigned w, unsigned h) {
     canvas_reset(canvas);
 
     // Reset the flushing parameters
-    canvas->force_flush = false;
+    canvas->force_flush = canvas->force_next_flush_only = false;
     canvas->flush_index = 0;
     CANVAS_CELL_CLEAR(canvas->flush_state);
-    canvas->flush_encode_offset = 0;
-    canvas->flush_last_index = 0;
 
     // For the sake of consistency, all blank cells store spaces
-    struct cell new_cell = canvas->style;
-    new_cell.code_point = ' ';
+    struct cell empty_cell = canvas->style, space_cell = canvas->style;
+    space_cell.code_point = ' ';
     for (unsigned y = 0; y < h; y++) {
         for (unsigned x = 0; x < w; x++) {
-            canvas->buf[0][x + y * w] = canvas->buf[1][x + y * w] = new_cell;
+            canvas->buf[0][x + y * w] = empty_cell;
+            canvas->buf[1][x + y * w] = space_cell;
         }
     }
 }
@@ -72,10 +71,15 @@ void canvas_erase(struct canvas *canvas) {
 
 bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_written) {
     if (canvas->flush_index == CANVAS_LEN) {
+        if (canvas->force_flush && canvas->force_next_flush_only) {
+            canvas->force_flush = canvas->force_next_flush_only = false;
+        }
+
         return false;
     }
 
-    size_t index = canvas->flush_index, remaining = len;
+    bool early_exit = false;
+    size_t index = canvas->flush_index, last_index = index, remaining = len;
     while (remaining > 0 && index < CANVAS_LEN) {
         struct cell prev = canvas->buf[0][index], next = canvas->buf[1][index];
 
@@ -86,46 +90,76 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
             continue;
         }
 
+        // There's a chance that part of this message will get cut off. To
+        // reduce complexity, we simply discard the output for an entire cell if
+        // a single part of it won't fit
+        size_t initial_remaining = remaining;
+
         // Move the cursor explicitly when the previous block wasn't changed or
         // was on a different line
-        bool noncontinuous = (canvas->flush_last_index + 1 != index),
+        bool noncontinuous = (last_index + 1 != index),
                 newline = (index % canvas->w == 0);
         if (noncontinuous || newline) {
             int x = (int) (index % canvas->w), y = (int) (index / canvas->w);
             int escape_len = snprintf(buf, remaining, "\x1b[%d;%dH", y + 1, x + 1);
+            if (escape_len < 0) {
+                remaining = initial_remaining;
+                break;
+            }
+            else if (escape_len >= remaining) {
+                remaining = initial_remaining;
+                early_exit = true;
+                break;
+            }
 
             buf += escape_len;
             remaining -= escape_len;
         }
 
-        canvas->flush_last_index = index;
+        // Emit styling if it's different from the last flushed character
+        if (!CANVAS_CELL_STYLE_EQ(canvas->flush_state, next)) {
+            int escape_len = snprintf(buf, remaining, "\x1b[%d;%dm",
+                                      (int)next.foreground + 30,(int)next.background + 40);
+            if (escape_len < 0) {
+                remaining = initial_remaining;
+            }
+            else if (escape_len >= remaining) {
+                remaining = initial_remaining;
+                early_exit = true;
+                break;
+            }
 
+            buf += escape_len;
+            remaining -= escape_len;
 
+            // Save the last flushed cell style
+            canvas->flush_state = next;
+        }
 
         // Now try to emit the actual character
-        size_t encoded_len = utf8_encode(canvas->flush_encode_offset, &buf, remaining,
-                                         next.code_point);
-
-        // The encoded character didn't entirely fit, so we'll need to send the
-        // rest next flush
+        size_t encoded_len = utf8_encode(next.code_point, &buf, remaining);
         if (encoded_len > remaining) {
-            canvas->flush_encode_offset = encoded_len - remaining;
-            remaining = 0;
+            remaining = initial_remaining;
+            early_exit = true;
             break;
         }
 
-        canvas->flush_encode_offset = 0;
         remaining -= encoded_len;
 
         // Mark the cell as clean
         canvas->buf[0][index] = next;
 
-        index++;
+        last_index = index++;
     }
 
     canvas->flush_index = index;
+
     *len_written = len - remaining;
-    return *len_written > 0;
+    if (!early_exit && *len_written > 0) {
+        return true;
+    }
+
+    return early_exit;
 }
 
 bool canvas_forced_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_written) {
@@ -133,6 +167,11 @@ bool canvas_forced_flush(struct canvas *canvas, char *buf, size_t len, size_t *l
     bool res = canvas_flush(canvas, buf, len, len_written);
     canvas->force_flush = false;
     return res;
+}
+
+void canvas_force_next_flush(struct canvas *canvas) {
+    canvas->force_flush = true;
+    canvas->force_next_flush_only = true;
 }
 
 void canvas_write_utf8(struct canvas *canvas, unsigned x, unsigned y, char *msg) {

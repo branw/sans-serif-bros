@@ -33,13 +33,94 @@ void disable_blocking(int fd) {
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+int run_standalone(struct db *db) {
+    // Disable terminal processing and receive raw ANSI sequences like with Telnet
+    enter_raw_mode();
+    atexit(exit_raw_mode);
+
+    // Don't block on reads to stdin
+    disable_blocking(STDIN_FILENO);
+
+    struct state state;
+    state_create(&state);
+
+    bool running = true;
+    while (running) {
+        char buf[512];
+        ssize_t read_len;
+        while ((read_len = read(STDIN_FILENO, buf, 512)) > 0) {
+            terminal_parse(&state.terminal, buf, read_len);
+        }
+
+        if (state_update(&state, db)) {
+            // Flush and send output data
+            size_t write_len;
+            while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
+                write(STDOUT_FILENO, buf, write_len);
+            }
+        }
+        else {
+            running = false;
+        }
+    }
+
+    printf("Shutting down...\n");
+
+    return EXIT_SUCCESS;
+}
+
+int run_server(struct db *db, char *service) {
+    // Launch the server
+    struct server server;
+    if (!server_create(&server, service)) {
+        fprintf(stderr, "failed to create server\n");
+
+        return EXIT_FAILURE;
+    }
+
+    // Accept new connections and update existing ones
+    while (server_update(&server)) {
+        // Update each session
+        struct session *session = NULL;
+        while (server_next_session(&server, &session)) {
+            // Poll the connection for data and parse it
+            bool alive;
+            char buf[512];
+            size_t len;
+            while ((alive = session_receive(session, buf, 512, &len)) && len > 0) {
+                terminal_parse(&session->state->terminal, buf, len);
+            }
+
+            // Try to update the state
+            if (alive && state_update(session->state, db)) {
+                // Flush and send output data
+                while (terminal_flush(&session->state->terminal, buf, 512, &len)) {
+                    session_send(session, buf, len);
+                }
+            }
+                // The connection was already disconnected or should be disconnected
+            else {
+                // Store the previous session so we don't break the iterator
+                struct session *prev = session->prev;
+                // Kill the connection
+                server_disconnect_session(&server, session);
+                session = prev;
+            }
+        }
+    }
+
+    server_destroy(&server);
+
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
-    char *port = NULL, *db_path = NULL;
+    char *port = "telnet", *db_path = "levels";
     bool standalone = false;
 
     // Parse command-line arguments
     int opt;
-    while ((opt = getopt(argc, argv, "hvdp:s")) != -1) {
+    while ((opt = getopt(argc, argv, "hvd:p:s")) != -1) {
         switch (opt) {
             case 'd': {
                 db_path = optarg;
@@ -81,99 +162,14 @@ int main(int argc, char *argv[]) {
 
     // Load the level metadata
     struct db db;
-    if (!db_create(&db, db_path ? db_path : "levels")) {
+    if (!db_create(&db, db_path)) {
         fprintf(stderr, "failed to create db\n");
         return EXIT_FAILURE;
     }
 
-    if (standalone) {
-        // Disable terminal processing and receive raw ANSI sequences like with Telnet
-        enter_raw_mode();
-        atexit(exit_raw_mode);
+    int rc = standalone ? run_standalone(&db) : run_server(&db, port);
 
-        // Don't block on reads to stdin
-        disable_blocking(STDIN_FILENO);
-
-        struct state state;
-        state_create(&state);
-
-        bool running = true;
-        while (running) {
-            char buf[512];
-            ssize_t read_len;
-            while ((read_len = read(STDIN_FILENO, buf, 512)) > 0) {
-                //printf("got %ld\n", read_len);
-                terminal_parse(&state.terminal, buf, read_len);
-            }
-
-            if (state_update(&state, &db)) {
-                // Flush and send output data
-                size_t write_len;
-                while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
-                    //printf("put %ld\n", write_len);
-                    write(STDOUT_FILENO, buf, write_len);
-                }
-            }
-            else {
-                running = false;
-            }
-        }
-
-        printf("Shutting down...\n");
-
-        db_destroy(&db);
-
-        return EXIT_SUCCESS;
-    }
-
-    // Launch the server
-    struct server server;
-    if (!server_create(&server, port ? port : "telnet")) {
-        fprintf(stderr, "failed to create server\n");
-
-        goto failure;
-    }
-
-    // Accept new connections and update existing ones
-    while (server_update(&server)) {
-        // Update each session
-        struct session *session = NULL;
-        while (server_next_session(&server, &session)) {
-            // Poll the connection for data and parse it
-            bool alive;
-            char buf[512];
-            size_t len;
-            while ((alive = session_receive(session, buf, 512, &len)) && len > 0) {
-                terminal_parse(&session->state->terminal, buf, len);
-            }
-
-            // Try to update the state
-            if (alive && state_update(session->state, &db)) {
-                // Flush and send output data
-                while (terminal_flush(&session->state->terminal, buf, 512, &len)) {
-                    session_send(session, buf, len);
-                }
-            }
-            // The connection was already disconnected or should be disconnected
-            else {
-                // Store the previous session so we don't break the iterator
-                struct session *prev = session->prev;
-                // Kill the connection
-                server_disconnect_session(&server, session);
-                session = prev;
-            }
-        }
-    }
-
-    printf("Shutting down...\n");
-
-    server_destroy(&server);
     db_destroy(&db);
 
-    return EXIT_SUCCESS;
-
-    failure:
-    db_destroy(&db);
-
-    return EXIT_FAILURE;
+    return rc;
 }

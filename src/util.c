@@ -13,7 +13,7 @@ unsigned long utf8_decode(char **s) {
     return value;
 }
 
-size_t utf8_encode(size_t offset, char **buf, size_t len, unsigned long code_point) {
+size_t utf8_encode_partial(unsigned long code_point, size_t offset, char **buf, size_t len) {
     char encoded[4] = {0};
     unsigned long lead_byte_max = 0x7f, encoded_len = 0;
 
@@ -30,4 +30,8 @@ size_t utf8_encode(size_t offset, char **buf, size_t len, unsigned long code_poi
         *(*buf)++ = encoded[index];
     }
     return written;
+}
+
+size_t utf8_encode(unsigned long code_point, char **buf, size_t len) {
+    return utf8_encode_partial(code_point, 0, buf, len);
 }
