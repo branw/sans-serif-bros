@@ -3,14 +3,14 @@
 #include "state.h"
 #include "db.h"
 #include "telnet.h"
+#include "env.h"
+#include "server.h"
 
 /*
  * Specific state handlers
  */
 
 static void init_screen_update(struct state *state) {
-    canvas_rect(&state->canvas, 2, 2, 4, 4, '#');
-
     // Negotiate Telnet configuration
     terminal_write(&state->terminal, IAC WILL ECHO);
     terminal_write(&state->terminal, IAC DONT ECHO);
@@ -26,16 +26,92 @@ static void init_screen_update(struct state *state) {
     state->screen = title_screen;
 }
 
-static bool title_screen_update(struct state *state, struct db *db) {
-    struct level *level;
-    if (!db_get_level(db, 1, &level)) {
-        printf("failed to get level!\n");
-        return false;
+static bool title_screen_update(struct state *state, struct env *env) {
+    // Handle input
+    if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
+        printf("%d %d\n", state->terminal.keyboard.space, state->terminal.keyboard.enter);
+
+        switch (state->selection) {
+            // classic mode
+            case 0: {
+                struct level *level;
+                if (!db_get_level(env->db, 1, &level)) {
+                    printf("failed to get level!\n");
+                    return false;
+                }
+
+                game_create(&state->game, level->field);
+
+                state->screen = game_screen;
+                return true;
+            }
+
+            // level pit
+            case 1:
+
+                break;
+
+            // instructions
+            case 2:
+
+                break;
+
+        }
+    }
+    else if (state->terminal.keyboard.up && state->selection > 0) {
+        state->selection--;
+    }
+    else if (state->terminal.keyboard.down && state->selection < 2) {
+        state->selection++;
     }
 
-    game_create(&state->game, level->field);
+    KEYBOARD_CLEAR(state->terminal.keyboard);
 
-    state->screen = game_screen;
+    canvas_erase(&state->canvas);
+
+    // Draw logo
+    char *logo =
+            " ______    ______    __   __    ______                           "
+            "/\\  ___\\  /\\  __ \\  /\\ \"-.\\ \\  /\\  ___\\                          "
+            "\\ \\___  \\ \\ \\  __ \\ \\ \\ \\-.  \\ \\ \\___  \\                         "
+            " \\/\\_____\\ \\ \\_\\ \\_\\ \\ \\_\\\\\"\\_\\ \\/\\_____\\                        "
+            "  \\/_____/  \\/_/\\/_/  \\/_/_\\/_/  \\/_____/   __    ______         "
+            "             /\\  ___\\  /\\  ___\\  /\\  == \\  /\\ \\  /\\  ___\\        "
+            "             \\ \\___  \\ \\ \\  __\\  \\ \\  __<  \\ \\ \\ \\ \\  __\\        "
+            "              \\/\\_____\\ \\ \\_____\\ \\ \\_\\ \\_\\ \\ \\_\\ \\ \\_\\          "
+            "               \\/_____/  \\/_____/  \\/_/_/_/  \\/_/__\\/_/ ______   "
+            "                         /\\  == \\  /\\  == \\  /\\  __ \\  /\\  ___\\  "
+            "                         \\ \\  __<  \\ \\  __<  \\ \\ \\/\\ \\ \\ \\___  \\ "
+            "                          \\ \\_____\\ \\ \\_\\ \\_\\ \\ \\_____\\ \\/\\_____\\"
+            "                           \\/_____/  \\/_/ /_/  \\/_____/  \\/_____/";
+
+    unsigned tick = (state->num_ticks % 16) / 4;
+    int dx = tick == 1 || tick == 2 ? 1 : 0;
+    int dy = tick == 2 || tick == 3 ? 1 : 0;
+    canvas_write_block(&state->canvas, 7 + dx, 1 + dy, 65, 13, logo);
+
+    char buf[32];
+    snprintf(buf, 32, "%d levels", env->db->num_levels);
+    canvas_write(&state->canvas, 4, 12, buf);
+    if (env->server) {
+        if (env->server->num_sessions == 1) {
+            canvas_write(&state->canvas, 4, 13, "1 player online");
+        }
+        else {
+            snprintf(buf, 32, "%ld players online", env->server->num_sessions);
+            canvas_write(&state->canvas, 4, 13, buf);
+        }
+    }
+    else {
+        canvas_write(&state->canvas, 4, 13, "single-player mode");
+    }
+    canvas_write(&state->canvas, 4, 14, "last updated 2020-5-29");
+
+    canvas_write(&state->canvas, 33, 17, "classic mode");
+    canvas_write(&state->canvas, 33, 19, "level pit");
+    canvas_write(&state->canvas, 33, 21, "instructions");
+
+    canvas_put(&state->canvas, 30, 17 + 2 * state->selection, '>');
 
     return true;
 }
@@ -60,6 +136,7 @@ static bool game_screen_update(struct state *state) {
     canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
                              (uint32_t *) state->game.field, ROWS * COLUMNS);
 
+    // Resend the entire canvas every so many ticks
     if (state->num_ticks % 100 == 99) {
         canvas_force_next_flush(&state->canvas);
     }
@@ -81,6 +158,8 @@ bool state_create(struct state *state) {
     state->last_tick.tv_sec = state->last_tick.tv_nsec = 0;
     state->num_ticks = 0;
 
+    state->selection = 0;
+
     return true;
 }
 
@@ -92,7 +171,7 @@ void state_destroy(struct state *state) {
 // Convert timespec to number in milliseconds
 #define TO_MS(t) ((t).tv_sec * 1000 + (t).tv_nsec / 1000000)
 
-bool state_update(struct state *state, struct db *db) {
+bool state_update(struct state *state, struct env *env) {
     struct timespec current;
     clock_gettime(CLOCK_MONOTONIC, &current);
 
@@ -113,7 +192,7 @@ bool state_update(struct state *state, struct db *db) {
         }
 
         case title_screen: {
-            return title_screen_update(state, db);
+            return title_screen_update(state, env);
         }
 
         case game_screen: {

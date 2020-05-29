@@ -66,6 +66,11 @@ bool canvas_flush(struct canvas *canvas, char *buf, size_t len, size_t *len_writ
 
 void canvas_force_next_flush(struct canvas *canvas);
 
+void canvas_write(struct canvas *canvas, unsigned x, unsigned y, char *msg);
+
+void canvas_write_block(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
+                        unsigned h, char *buf);
+
 void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
                               unsigned h, uint32_t *buf, size_t len);
 

@@ -9,6 +9,8 @@ bool terminal_create(struct terminal *terminal, struct canvas *canvas) {
 
     terminal->buffer_len = terminal->buffer_flushed_len = 0;
 
+    terminal->keyboard = (struct keyboard_input){0};
+
     return true;
 }
 
@@ -36,6 +38,24 @@ void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
                     continue;
                 }
             }
+        }
+        else if (ch == ' ') {
+            terminal->keyboard.space = 1;
+        }
+        else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+            unsigned place = (ch & 0xdf) - 'A';
+            terminal->keyboard.alphas |= 1u << place;
+        }
+        else if (ch >= '0' && ch <= '9') {
+            unsigned place = ch - '0';
+            terminal->keyboard.nums |= 1u << place;
+        }
+        else if (ch == '\x0d') {
+            terminal->keyboard.enter = 1;
+        }
+        // This could also be triggered by unhandled escape sequences
+        else if (ch == '\x1b') {
+            terminal->keyboard.esc = 1;
         }
 
         buf++;

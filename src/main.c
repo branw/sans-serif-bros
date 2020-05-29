@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <env.h>
 #include "db.h"
 #include "server.h"
 
@@ -41,6 +42,8 @@ int run_standalone(struct db *db) {
     // Don't block on reads to stdin
     disable_blocking(STDIN_FILENO);
 
+    struct env env = {.db=db};
+
     struct state state;
     state_create(&state);
 
@@ -52,7 +55,7 @@ int run_standalone(struct db *db) {
             terminal_parse(&state.terminal, buf, read_len);
         }
 
-        if (state_update(&state, db)) {
+        if (state_update(&state, &env)) {
             // Flush and send output data
             size_t write_len;
             while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
@@ -78,6 +81,8 @@ int run_server(struct db *db, char *service) {
         return EXIT_FAILURE;
     }
 
+    struct env env = {.db=db, .server=&server};
+
     // Accept new connections and update existing ones
     while (server_update(&server)) {
         // Update each session
@@ -92,7 +97,7 @@ int run_server(struct db *db, char *service) {
             }
 
             // Try to update the state
-            if (alive && state_update(session->state, db)) {
+            if (alive && state_update(session->state, &env)) {
                 // Flush and send output data
                 while (terminal_flush(&session->state->terminal, buf, 512, &len)) {
                     session_send(session, buf, len);

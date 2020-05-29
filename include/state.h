@@ -6,6 +6,7 @@
 #include "canvas.h"
 #include "terminal.h"
 #include "game.h"
+#include "env.h"
 
 enum screen {
     init_screen, title_screen, game_screen,
@@ -21,6 +22,7 @@ struct state {
     struct timespec last_tick;
     size_t num_ticks;
 
+    int selection;
     struct game game;
 };
 
@@ -30,6 +32,6 @@ bool state_create(struct state *state);
 
 void state_destroy(struct state *state);
 
-bool state_update(struct state *state, struct db *db);
+bool state_update(struct state *state, struct env *env);
 
 #endif //SSB_STATE_H
