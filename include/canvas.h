@@ -76,6 +76,9 @@ void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, u
 
 void canvas_put(struct canvas *canvas, unsigned x, unsigned y, unsigned long c);
 
+void canvas_fill(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
+                 unsigned long symbol);
+
 void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol);
 

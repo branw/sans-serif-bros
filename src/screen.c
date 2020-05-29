@@ -140,19 +140,27 @@ struct screen_impl game_screen_impl = {
 };
 
 struct game_screen_state {
+    int level_id;
     struct game game;
+
+    int transition_ticks;
 };
 
 struct screen *game_screen_create(struct env *env, int level_id) {
+    struct screen *screen = malloc(sizeof(struct screen) + sizeof(struct game_screen_state));
+    *(struct game_screen_state *)screen->data = (struct game_screen_state){
+        .level_id = level_id,
+        .game = {0},
+        .transition_ticks = -1,
+    };
+    screen->impl = &game_screen_impl;
+
+    // Load the level from the database
     struct level *level;
     if (!db_get_level(env->db, level_id, &level)) {
         printf("failed to get level!\n");
         return false;
     }
-
-    struct screen *screen = malloc(sizeof(struct screen) + sizeof(struct game_screen_state));
-    *(struct game_screen_state *)screen->data = (struct game_screen_state){0};
-    screen->impl = &game_screen_impl;
 
     game_create(&((struct game_screen_state *)screen->data)->game, level->field);
 
@@ -162,6 +170,34 @@ struct screen *game_screen_create(struct env *env, int level_id) {
 bool game_screen_update(void *data, struct state *state, struct env *env) {
     struct game_screen_state *screen = data;
 
+    bool color = true;
+    if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
+        struct level *level;
+        if (!db_get_level(env->db, screen->level_id, &level)) {
+            printf("failed to get level!\n");
+            return false;
+        }
+
+        game_create(&screen->game, level->field);
+
+        color = false;
+        canvas_foreground(&state->canvas, blue);
+        canvas_background(&state->canvas, blue);
+    }
+    else if (state->terminal.keyboard.space && screen->game.win) {
+        struct level *level;
+        if (!db_get_level(env->db, ++screen->level_id, &level)) {
+            printf("failed to get level!\n");
+            return false;
+        }
+
+        game_create(&screen->game, level->field);
+
+        color = false;
+        canvas_foreground(&state->canvas, green);
+        canvas_background(&state->canvas, green);
+    }
+
     struct directional_input input;
     terminal_get_directional_input(&state->terminal, &input, false);
 
@@ -169,17 +205,38 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
 
     KEYBOARD_CLEAR(state->terminal.keyboard);
 
-    if (screen->game.win) {
+    if (color && screen->game.win) {
         canvas_foreground(&state->canvas, black);
         canvas_background(&state->canvas, green);
     }
-    else {
+    else if (color && screen->game.die) {
+        canvas_foreground(&state->canvas, black);
+        canvas_background(&state->canvas, red);
+    }
+    else if (color) {
         canvas_foreground(&state->canvas, white);
         canvas_background(&state->canvas, black);
     }
 
     canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
                              (uint32_t *) screen->game.field, ROWS * COLUMNS);
+
+    if (screen->game.die && state->num_ticks % 20 < 10) {
+        canvas_foreground(&state->canvas, red);
+        canvas_background(&state->canvas, black);
+
+        canvas_fill(&state->canvas, 29, 9, 22, 7, ' ');
+        canvas_rect(&state->canvas, 30, 10, 20, 5, '#');
+        canvas_write(&state->canvas, 32, 12, "press R to retry");
+    }
+    else if (screen->game.win && state->num_ticks % 20 < 10) {
+        canvas_foreground(&state->canvas, green);
+        canvas_background(&state->canvas, black);
+
+        canvas_fill(&state->canvas, 26, 9, 29, 7, ' ');
+        canvas_rect(&state->canvas, 27, 10, 27, 5, '#');
+        canvas_write(&state->canvas, 29, 12, "press space to continue");
+    }
 
     // Resend the entire canvas every so many ticks
     if (state->num_ticks % 100 == 99) {

@@ -251,6 +251,23 @@ unsigned long canvas_get(struct canvas *canvas, unsigned x, unsigned y) {
     return canvas->buf[1][x + y * canvas->w].code_point;
 }
 
+void canvas_fill(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
+                 unsigned long symbol) {
+    assert(x + w <= canvas->w);
+    assert(y + h <= canvas->h);
+
+    struct cell new_cell = canvas->style;
+    new_cell.code_point = symbol;
+
+    for (unsigned row = y; row < y + h; row++) {
+        for (unsigned col = x; col < x + w; col++) {
+            canvas->buf[1][col + row * canvas->w] = new_cell;
+        }
+    }
+
+    canvas->flush_index = 0;
+}
+
 void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol) {
     assert(x + w <= canvas->w);
