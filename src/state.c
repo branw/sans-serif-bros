@@ -50,6 +50,8 @@ bool state_push_screen(struct state *state, struct screen *screen) {
         return false;
     }
 
+    KEYBOARD_CLEAR(state->terminal.keyboard);
+
     state->screens[state->num_screens++] = screen;
     return true;
 }

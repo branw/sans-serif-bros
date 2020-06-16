@@ -49,6 +49,8 @@ void db_destroy(struct db *db);
 
 bool db_get_metadata(struct db *db, uint32_t id, struct metadata **metadata);
 
+int db_num_levels(struct db *db);
+
 bool db_get_level(struct db *db, uint32_t id, struct level **level);
 
 bool db_create_level(struct db *db, char *name, uint32_t *field, struct level **out);

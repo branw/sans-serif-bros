@@ -558,6 +558,10 @@ bool db_get_metadata(struct db *db, uint32_t id, struct metadata **metadata) {
     return true;
 }
 
+int db_num_levels(struct db *db) {
+    return db->num_levels;
+}
+
 bool db_get_level(struct db *db, uint32_t id, struct level **level) {
     struct node *node = NULL;
     if (!tree_search(&db->tree, id, &node) || !node) {

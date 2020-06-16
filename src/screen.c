@@ -57,15 +57,14 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
     if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
         switch (screen->selection) {
             // classic mode
-            case 0: {
+            case 0:
                 state_push_screen(state, game_screen_create(env, 1));
                 return true;
-            }
 
-                // level pit
+            // level pit
             case 1:
-
-                break;
+                state_push_screen(state, level_pit_screen_create(env));
+                return true;
 
                 // instructions
             case 2:
@@ -107,7 +106,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
     canvas_write_block(&state->canvas, 7 + dx, 1 + dy, 65, 13, logo);
 
     char buf[32];
-    snprintf(buf, 32, "%d levels", env->db->num_levels);
+    snprintf(buf, 32, "%d levels", db_num_levels(env->db));
     canvas_write(&state->canvas, 4, 12, buf);
     if (env->server) {
         if (env->server->num_sessions == 1) {
@@ -170,7 +169,10 @@ struct screen *game_screen_create(struct env *env, int level_id) {
 bool game_screen_update(void *data, struct state *state, struct env *env) {
     struct game_screen_state *screen = data;
 
+    // Allow flashes of color during transitions
     bool color = true;
+
+    // Handle inputs
     if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
         struct level *level;
         if (!db_get_level(env->db, screen->level_id, &level)) {
@@ -205,6 +207,7 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
 
     KEYBOARD_CLEAR(state->terminal.keyboard);
 
+    // Color based on the current state
     if (color && screen->game.win) {
         canvas_foreground(&state->canvas, black);
         canvas_background(&state->canvas, green);
@@ -218,9 +221,45 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_background(&state->canvas, black);
     }
 
+    // Draw the game field
     canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
                              (uint32_t *) screen->game.field, ROWS * COLUMNS);
 
+    // Color individual cells
+    if (color && !screen->game.win && !screen->game.die) {
+        for (unsigned y = 0; y < 25; y++) {
+            for (unsigned x = 0; x < 80; x++) {
+                unsigned long ch = screen->game.field[y][x];
+                switch (ch) {
+                    case 'I':
+                        canvas_foreground(&state->canvas, black);
+                        canvas_background(&state->canvas, blue);
+                        break;
+
+                    case 0xa3:
+                    case 'E':
+                        canvas_foreground(&state->canvas, black);
+                        canvas_background(&state->canvas, green);
+                        break;
+
+                    case '[':
+                    case ']':
+                    case '{':
+                    case '}':
+                    case 'X':
+                    case '%':
+                        canvas_foreground(&state->canvas, black);
+                        canvas_background(&state->canvas, red);
+                        break;
+
+                    default: continue;
+                }
+                canvas_put(&state->canvas, x, y, ch);
+            }
+        }
+    }
+
+    // Draw instructions
     if (screen->game.die && state->num_ticks % 20 < 10) {
         canvas_foreground(&state->canvas, red);
         canvas_background(&state->canvas, black);
@@ -242,6 +281,91 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     if (state->num_ticks % 100 == 99) {
         canvas_force_next_flush(&state->canvas);
     }
+
+    return true;
+}
+
+
+struct screen_impl level_pit_screen_impl = {
+        .update=level_pit_screen_update
+};
+
+struct level_pit_screen_state {
+    int top_id;
+    int selected_id;
+};
+
+struct screen *level_pit_screen_create(struct env *env) {
+    struct screen *screen = malloc(sizeof(struct screen) + sizeof(struct level_pit_screen_state));
+    *(struct level_pit_screen_state *)screen->data = (struct level_pit_screen_state){
+        .top_id = 1,
+        .selected_id = 1,
+    };
+    screen->impl = &level_pit_screen_impl;
+    return screen;
+}
+
+bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
+    struct level_pit_screen_state *screen = data;
+
+    // Handle input
+    if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
+        state_push_screen(state, game_screen_create(env, screen->selected_id));
+    }
+    else if (state->terminal.keyboard.up && screen->selected_id > 0) {
+        screen->selected_id--;
+    }
+    else if (state->terminal.keyboard.down && screen->selected_id < 4000) {
+        screen->selected_id++;
+    }
+
+    KEYBOARD_CLEAR(state->terminal.keyboard);
+
+    canvas_erase(&state->canvas);
+
+    char *logo =
+            " __      ______  __   ________  __           ______  __  ______ "
+            "/\\ \\    /\\  ___\\/\\ \\ / /\\  ___\\/\\ \\         /\\  == \\/\\ \\/\\__  _\\"
+            "\\ \\ \\___\\ \\  __\\\\ \\ \\'/\\ \\  __\\\\ \\ \\____    \\ \\  _-/\\ \\ \\/_/\\ \\/"
+            " \\ \\_____\\ \\_____\\ \\__| \\ \\_____\\ \\_____\\    \\ \\_\\   \\ \\_\\ \\ \\_\\"
+            "  \\/_____/\\/_____/\\/_/   \\/_____/\\/_____/     \\/_/    \\/_/  \\/_/";
+
+    canvas_write_block(&state->canvas, 8, 0, 64, 5, logo);
+
+    char *header =
+            "    # NAME         CREATED    PLAYS   WINRATE BEST TIME"
+            "===== ============ ========== ======= ======= =========";
+
+    canvas_write_block(&state->canvas, 12, 6, 55, 2, header);
+
+    /*
+    int selected_id_index = 0;
+    void *node = NULL;
+    struct metadata metadata = {.id = screen->top_id};
+    for (int i = 0; i < 16; i++) {
+        if (!db_next_level(env->db, &node, &metadata)) {
+            break;
+        }
+
+        char buf[80];
+        snprintf(buf, 80, "%5d %-12s %10s %7d   %3.1f%% %9s",
+                metadata.id, "foobar", "2020-05-12", 999999, 99.9f, "0:34.2");
+
+        if (metadata.id == screen->selected_id) {
+            canvas_foreground(&state->canvas, black);
+            canvas_background(&state->canvas, white);
+        }
+        else {
+            canvas_foreground(&state->canvas, white);
+            canvas_background(&state->canvas, black);
+        }
+
+        canvas_write(&state->canvas, 12, 8 + i, buf);
+    }
+     */
+
+    canvas_foreground(&state->canvas, white);
+    canvas_background(&state->canvas, black);
 
     return true;
 }
