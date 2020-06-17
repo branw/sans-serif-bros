@@ -2,6 +2,8 @@
 
 A classic ASCII platformer revived with a Telnet interface
 
+![Screenshot](https://user-images.githubusercontent.com/2104778/84941147-f33ed200-b0ae-11ea-9bb1-4fc491022c53.png)
+
 ## Building
 
 `ssb` requires a C11 compiler and Linux headers.
