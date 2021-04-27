@@ -9,7 +9,7 @@
 #include "server.h"
 
 #define USAGE "usage: ssb [-hvs] [-d path/to/db] [-p port]\n"
-#define VERSION GIT_COMMIT_HASH
+#define VERSION "0.1"
 
 struct termios orig_termios;
 
