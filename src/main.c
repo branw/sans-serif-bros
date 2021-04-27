@@ -13,10 +13,6 @@
 
 struct termios orig_termios;
 
-void exit_raw_mode(void) {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-}
-
 void enter_raw_mode(void) {
     tcgetattr(STDIN_FILENO, &orig_termios);
 
@@ -29,15 +25,37 @@ void enter_raw_mode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+void exit_raw_mode(void) {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void show_cursor(void) {
+    printf("\x1b[?25h");
+}
+
 void disable_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+void restore_terminal(void) {
+    exit_raw_mode();
+    show_cursor();
+}
+
+void handle_sig_term(int signal) {
+    // Ensure that exit handlers are invoked
+    exit(signal);
+}
+
 int run_standalone(struct db *db) {
     // Disable terminal processing and receive raw ANSI sequences like with Telnet
     enter_raw_mode();
-    atexit(exit_raw_mode);
+    atexit(restore_terminal);
+
+    // Catch SIGINT (e.g. from ^C) and make sure we exit raw mode; atexit is
+    // not invoked in this case
+    signal(SIGINT, handle_sig_term);
 
     // Don't block on reads to stdin
     disable_blocking(STDIN_FILENO);
