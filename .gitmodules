@@ -1,0 +1,3 @@
+[submodule "ext/baro"]
+	path = ext/baro
+	url = git@github.com:branw/baro.git
