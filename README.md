@@ -6,12 +6,10 @@ A classic ASCII platformer revived with a Telnet interface
 
 ## Building
 
-`ssb` requires a C11 compiler and Linux headers.
+`ssb` requires `gcc`, `make`, and Linux headers. To build and run unit tests:
 
 ```shell script
-mkdir build; cd build;
-cmake -H..; make;
-cp -R ../levels .;
+make
 ```
 
 ## Playing
