@@ -4,7 +4,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
-#include <env.h>
+#include <signal.h>
+#include "env.h"
 #include "db.h"
 #include "server.h"
 
