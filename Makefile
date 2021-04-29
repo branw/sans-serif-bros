@@ -1,6 +1,6 @@
-LIBS =
 CC = gcc
-CFLAGS = -g -Wall -std=c99 -fsanitize=address -fsanitize=undefined -O0 -fno-omit-frame-pointer
+CFLAGS = -Wall -std=c99
+INC = include ext/baro
 
 .PHONY: default all test clean
 
@@ -14,7 +14,7 @@ TEST_OBJECTS = $(patsubst %.c, %.test.o, ext/baro/baro.c $(SOURCES))
 HEADERS = ext/baro/baro.h $(wildcard include/*.h)
 
 %.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@ -Iinclude -Iext/baro
+	$(CC) $(CFLAGS) $(INC:%=-I%) -c $< -o $@
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
@@ -22,7 +22,7 @@ ssb: $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $(LIBS) -o $@
 
 %.test.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@ -Iinclude -Iext/baro -DBARO_ENABLE
+	$(CC) $(CFLAGS) $(INC:%=-I%) -DBARO_ENABLE -c $< -o $@
 
 test-ssb: $(TEST_OBJECTS)
 	$(CC) $(CFLAGS) $(TEST_OBJECTS) $(LIBS) -o $@
@@ -31,6 +31,6 @@ test: test-ssb
 	./$<
 
 clean:
-	-rm -f src/*.o
+	-rm -f $(OBJECTS) $(TEST_OBJECTS)
 	-rm -f ssb
 	-rm -f test-ssb
