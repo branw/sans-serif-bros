@@ -6,10 +6,12 @@ A classic ASCII platformer revived with a Telnet interface
 
 ## Building
 
-`ssb` requires `gcc`, `make`, and Linux headers. To build and run unit tests:
+`ssb` requires `gcc`, `cmake`, and Linux headers. To build and run unit tests:
 
 ```shell script
-make
+cmake .;
+make;
+ctest --verbose;
 ```
 
 ## Playing
