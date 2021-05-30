@@ -548,14 +548,28 @@ void db_destroy(struct db *db) {
     tree_destroy(&db->tree);
 }
 
-bool db_get_metadata(struct db *db, uint32_t id, struct metadata **metadata) {
+//bool db_get_metadata(struct db *db, uint32_t id, struct metadata **metadata) {
+//    struct node *node = NULL;
+//    if (!tree_search(&db->tree, id, &node) || !node) {
+//        return false;
+//    }
+//
+//    *metadata = &node->level.metadata;
+//    return true;
+//}
+
+int db_get_metadata(struct db *db, uint32_t id, struct metadata **metadata, int count) {
     struct node *node = NULL;
     if (!tree_search(&db->tree, id, &node) || !node) {
-        return false;
+        return 0;
     }
 
-    *metadata = &node->level.metadata;
-    return true;
+    int num = 0;
+    do {
+        metadata[num] = &node->level.metadata;
+        num++;
+    } while (--count && tree_next(&db->tree, &node));
+    return num;
 }
 
 int db_num_levels(struct db *db) {
