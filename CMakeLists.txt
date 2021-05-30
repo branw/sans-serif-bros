@@ -6,7 +6,8 @@ set(CMAKE_C_STANDARD 11)
 
 set(SOURCES
         src/server.c src/session.c src/state.c src/terminal.c src/game.c
-        src/util.c src/canvas.c src/db.c src/screen.c)
+        src/util.c src/canvas.c src/db.c src/screen.c
+        src/screens/title.c src/screens/levels.c src/screens/game.c)
 
 add_executable(ssb src/main.c ${SOURCES})
 target_include_directories(ssb PRIVATE include ext/baro)
