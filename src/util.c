@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <baro.h>
 #include "util.h"
 
 unsigned long utf8_decode(char **s) {
@@ -11,6 +12,10 @@ unsigned long utf8_decode(char **s) {
         value += (**(unsigned char **)s & 0x3Fu);
     }
     return value;
+}
+
+TEST("") {
+    CHECK(0);
 }
 
 size_t utf8_encode_partial(unsigned long code_point, size_t offset, char **buf, size_t len) {

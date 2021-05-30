@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <libc.h>
+#include "util.h"
 #include "db.h"
 #include "state.h"
 #include "screen.h"
@@ -48,9 +48,9 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
 
     for (int i = 0; i < MIN(num_levels, 16); i++) {
         char buf[80];
-        snprintf(buf, 80, "%5d %-12s %10s %7d   %3.1f%% %9s",
-                metadata[i]->id, metadata[i]->name, "2020-05-12",
-                metadata[i]->num_plays, metadata[i]->num_wins/metadata[i]->num_plays,
+        snprintf(buf, 80, "%5d %-12s %10s %7d   %3.1u%% %9s",
+                metadata[i]->id, (char *) metadata[i]->name, "2020-05-12",
+                metadata[i]->num_plays, metadata[i]->num_wins / metadata[i]->num_plays,
                 "0:34.2");
 
         if (metadata[i]->id == screen->selected_id) {
