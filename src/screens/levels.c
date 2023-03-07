@@ -46,7 +46,7 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     struct metadata *metadata[16];
     int const num_levels = db_get_metadata(env->db, screen->top_id, metadata, 16 + 1);
 
-    for (int i = 0; i < MIN(num_levels, 16); i++) {
+    for (int i = 0; i < SSB_MIN(num_levels, 16); i++) {
         char buf[80];
         snprintf(buf, 80, "%5d %-12s %10s %7d   %3.1u%% %9s",
                 metadata[i]->id, (char *) metadata[i]->name, "2020-05-12",
