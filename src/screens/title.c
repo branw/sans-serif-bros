@@ -67,6 +67,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
 
     KEYBOARD_CLEAR(state->terminal.keyboard);
 
+    canvas_reset(&state->canvas);
     canvas_erase(&state->canvas);
 
     // Draw logo

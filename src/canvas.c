@@ -181,7 +181,7 @@ void canvas_write(struct canvas *canvas, unsigned x, unsigned y, char *msg) {
     struct cell *cell = &canvas->buf[1][x + y * canvas->w];
     for (unsigned i = 0; i < len; i++, cell++, msg++) {
         struct cell new_cell = canvas->style;
-        new_cell.code_point = *msg;
+        new_cell.code_point = (uint8_t)*msg;
         *cell = new_cell;
     }
 }
@@ -196,7 +196,7 @@ void canvas_write_block(struct canvas *canvas, unsigned x1, unsigned y1, unsigne
         struct cell *cell = &canvas->buf[1][x1 + y * canvas->w];
         for (unsigned x = x1; x < x1 + w; x++, buf++, cell++) {
             struct cell new_cell = canvas->style;
-            new_cell.code_point = *buf;
+            new_cell.code_point = (uint8_t)*buf;
             *cell = new_cell;
         }
     }
@@ -277,7 +277,7 @@ void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
     new_cell.code_point = symbol;
 
     for (unsigned row = y; row < y + h; row++) {
-        int step = (row == y || row == y + h - 1) ? 1 : w - 1;
+        unsigned step = (row == y || row == y + h - 1) ? 1 : w - 1;
         for (unsigned col = x; col < x + w; col += step) {
             canvas->buf[1][col + row * canvas->w] = new_cell;
         }

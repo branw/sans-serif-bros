@@ -65,7 +65,7 @@ void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
 
 bool terminal_flush(struct terminal *terminal, char *buf, size_t len, size_t *len_written) {
     if (terminal->buffer_flushed_len != terminal->buffer_len) {
-        int to_write = terminal->buffer_len - terminal->buffer_flushed_len;
+        size_t to_write = terminal->buffer_len - terminal->buffer_flushed_len;
         if (to_write > len) {
             to_write = len;
         }

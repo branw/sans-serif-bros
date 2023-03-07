@@ -3,3 +3,5 @@
 *.o
 ssb
 test-ssb
+
+cmake-build-*/

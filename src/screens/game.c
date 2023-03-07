@@ -55,8 +55,9 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         color = false;
         canvas_foreground(&state->canvas, blue);
         canvas_background(&state->canvas, blue);
-    }
-    else if (state->terminal.keyboard.space && screen->game.win) {
+    } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'Q')) {
+        return false;
+    } else if (state->terminal.keyboard.space && screen->game.win) {
         struct level *level;
         if (!db_get_level(env->db, ++screen->level_id, &level)) {
             printf("failed to get level!\n");

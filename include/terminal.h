@@ -28,22 +28,22 @@ struct keyboard_input {
     uint16_t nums;
     uint16_t fs;
 
-    int esc : 1;
-    int tab : 1;
-    int backspace : 1;
-    int enter : 1;
-    int space : 1;
+    uint8_t esc : 1;
+    uint8_t tab : 1;
+    uint8_t backspace : 1;
+    uint8_t enter : 1;
+    uint8_t space : 1;
 
-    int up : 1;
-    int down : 1;
-    int left : 1;
-    int right : 1;
+    uint8_t up : 1;
+    uint8_t down : 1;
+    uint8_t left : 1;
+    uint8_t right : 1;
 
-    int insert : 1;
-    int delete : 1;
-    int home : 1;
-    int page_up : 1;
-    int page_down : 1;
+    uint8_t insert : 1;
+    uint8_t delete : 1;
+    uint8_t home : 1;
+    uint8_t page_up : 1;
+    uint8_t page_down : 1;
 };
 
 struct terminal {
@@ -52,7 +52,7 @@ struct terminal {
     struct keyboard_input keyboard;
 
     char buffer[4096];
-    int buffer_len, buffer_flushed_len;
+    size_t buffer_len, buffer_flushed_len;
 };
 
 // Create a new terminal instance

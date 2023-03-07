@@ -465,7 +465,7 @@ static void process_frame_8(struct game *state) {
             case 'd': {
                 int d = (ch == 'd') ? -1 : 1;
                 if (probe(state, x + d, y, ch)) {
-                    state->next_field[y][x] = (char) ((ch == 'd') ? 'b' : 'd');
+                    state->next_field[y][x] = (uint8_t) ((ch == 'd') ? 'b' : 'd');
                 } else {
                     state->next_field[y][x] = ' ';
                     state->next_field[y][x + d] = ch;
