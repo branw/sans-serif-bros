@@ -14,6 +14,14 @@
 
 struct termios orig_termios;
 
+volatile sig_atomic_t running = true;
+
+void handle_signal(int signal_num) {
+    fprintf(stderr, "Got signal %d\n", signal_num);
+
+    running = false;
+}
+
 void enter_raw_mode(void) {
     tcgetattr(STDIN_FILENO, &orig_termios);
 
@@ -44,19 +52,10 @@ void restore_terminal(void) {
     show_cursor();
 }
 
-void handle_sig_term(int signal) {
-    // Ensure that exit handlers are invoked
-    exit(signal);
-}
-
 int run_standalone(struct db *db) {
     // Disable terminal processing and receive raw ANSI sequences like with Telnet
     enter_raw_mode();
     atexit(restore_terminal);
-
-    // Catch SIGINT (e.g. from ^C) and make sure we exit raw mode; atexit is
-    // not invoked in this case
-    signal(SIGINT, handle_sig_term);
 
     // Don't block on reads to stdin
     disable_blocking(STDIN_FILENO);
@@ -66,7 +65,6 @@ int run_standalone(struct db *db) {
     struct state state;
     state_create(&state);
 
-    bool running = true;
     while (running) {
         char buf[512];
         ssize_t read_len;
@@ -86,7 +84,7 @@ int run_standalone(struct db *db) {
         }
     }
 
-    printf("Shutting down...\n");
+    printf("Shutting down standalone mode...\n");
 
     return EXIT_SUCCESS;
 }
@@ -103,7 +101,7 @@ int run_server(struct db *db, char *service) {
     struct env env = {.db=db, .server=&server};
 
     // Accept new connections and update existing ones
-    while (server_update(&server)) {
+    while (running && server_update(&server)) {
         // Update each session
         struct session *session = NULL;
         while (server_next_session(&server, &session)) {
@@ -132,6 +130,8 @@ int run_server(struct db *db, char *service) {
             }
         }
     }
+
+    printf("Shutting down server...\n");
 
     server_destroy(&server);
 
@@ -191,9 +191,18 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = handle_signal;
+    sigaction(SIGTERM, &action, NULL);
+
     int rc = standalone ? run_standalone(&db) : run_server(&db, port);
 
+    printf("Saving database\n");
+
     db_destroy(&db);
+
+    printf("Shutdown complete\n");
 
     return rc;
 }
