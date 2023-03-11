@@ -3,6 +3,7 @@
 #include "terminal.h"
 #include "session.h"
 #include "telnet.h"
+#include "util.h"
 
 bool terminal_create(struct terminal *terminal, struct canvas *canvas) {
     terminal->canvas = canvas;
@@ -11,11 +12,50 @@ bool terminal_create(struct terminal *terminal, struct canvas *canvas) {
 
     terminal->keyboard = (struct keyboard_input){0};
 
+    terminal->will_naws = false;
+
     return true;
 }
 
 void terminal_destroy(struct terminal *terminal) {
 
+}
+
+static void parse_telnet_command(struct terminal *terminal, char **buf, size_t *len) {
+    // Escaped chr 255, which we don't care about
+    if ((*buf)[1] == *IAC) {
+        *buf += 2;
+        *len -= 2;
+        return;
+    }
+
+    // Negotiations:
+    // IAC WILL/WONT/DO/DONT <option>
+    if (*len >= 3 &&
+        ((*buf)[1] == *WILL || (*buf)[1] == *WONT ||
+                (*buf)[1] == *DO || (*buf)[1] == *DONT)) {
+        // "Negotiate About Window Size"
+        if ((*buf)[2] == *NAWS) {
+            terminal->will_naws = ((*buf)[1] == *WILL);
+        }
+
+        *buf += 3;
+        *len -= 3;
+        return;
+    }
+
+    // Sub-options:
+    // IAC SB <option> <values...> IAC SE
+    if (*len >= 5 && (*buf)[1] == *SB) {
+        if ((*buf)[2] == *NAWS) {
+            char const *end = kmp_strnstr(&(*buf)[2], IAC SE, *len - 2);
+            if (end == NULL) {
+                return;
+            }
+
+            //TODO
+        }
+    }
 }
 
 void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
@@ -56,6 +96,10 @@ void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
         // This could also be triggered by unhandled escape sequences
         else if (ch == '\x1b') {
             terminal->keyboard.esc = 1;
+        }
+        // Telnet command
+        else if (ch == *IAC && len >= 2) {
+            parse_telnet_command(terminal, &buf, &len);
         }
 
         buf++;

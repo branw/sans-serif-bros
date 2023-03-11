@@ -53,6 +53,8 @@ struct terminal {
 
     char buffer[4096];
     size_t buffer_len, buffer_flushed_len;
+
+    bool will_naws;
 };
 
 // Create a new terminal instance

@@ -1,6 +1,7 @@
 #include <baro.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include "util.h"
 
 unsigned long utf8_decode(char **s) {
@@ -72,4 +73,94 @@ TEST("[util] utf8_encode") {
         }
         REQUIRE_STR_EQ(buf, str);
     }
+}
+
+static int *kmp_borders(const char *needle, size_t len) {
+    if (needle == NULL) {
+        return NULL;
+    }
+
+    int *borders = malloc((len+1) * sizeof(*borders));
+    if (borders == NULL) {
+        return NULL;
+    }
+
+    size_t i = 0;
+    int j = -1;
+    borders[i] = j;
+
+    while (i < len) {
+        while (j >= 0 && needle[i] != needle[j]) {
+            j = borders[j];
+        }
+        ++i;
+        ++j;
+        borders[i] = j;
+    }
+
+    return borders;
+}
+
+static char const *kmp_search(char const *haystack, size_t haystack_len,
+                        const char *needle, size_t needle_len, const int *borders){
+    size_t max_index = haystack_len - needle_len, i = 0, j = 0;
+    while (i <= max_index) {
+        while (j < needle_len && *haystack && needle[j] == *haystack){
+            ++j;
+            ++haystack;
+        }
+        if (j == needle_len) {
+            return haystack - needle_len;
+        }
+        if (*haystack == '\0') {
+            return NULL;
+        }
+        if (j == 0) {
+            ++haystack;
+            ++i;
+        } else {
+            do {
+                i += j - (size_t)borders[j];
+                j = borders[j];
+            } while (j > 0 && needle[j] != *haystack);
+        }
+    }
+    return NULL;
+}
+
+// Knuth-Morris-Pratt (KMP) string search. Like strstr, but O(m + n) and it
+// can handle non-NUL-terminated strings. Portable equivalent of BSD's strnstr.
+char const *kmp_strnstr(char const *haystack, char const *needle, size_t haystack_len) {
+    if (haystack == NULL || needle == NULL) {
+        return NULL;
+    }
+
+    size_t needle_len = strlen(needle);
+    if (haystack_len < needle_len) {
+        return NULL;
+    }
+
+    int *borders = kmp_borders(needle, needle_len);
+    if (borders == NULL) {
+        return NULL;
+    }
+
+    char const *match = kmp_search(haystack, haystack_len, needle, needle_len, borders);
+
+    free(borders);
+    return match;
+}
+
+TEST("[util] kmp_strnstr") {
+    char const *haystack1 = "foobarbaz";
+    size_t const haystack1_len = 9;
+
+    REQUIRE_EQ(kmp_strnstr(haystack1,  "foo", haystack1_len), haystack1);
+    REQUIRE_EQ(kmp_strnstr(haystack1,  "o", haystack1_len), &haystack1[1]);
+    REQUIRE_EQ(kmp_strnstr(haystack1,  "bar", haystack1_len), &haystack1[3]);
+    REQUIRE_EQ(kmp_strnstr(haystack1,  "z", haystack1_len), &haystack1[8]);
+    REQUIRE_EQ(kmp_strnstr(haystack1,  "bazinga", haystack1_len), NULL);
+
+    REQUIRE_EQ(kmp_strnstr(haystack1, NULL, haystack1_len), NULL);
+    REQUIRE_EQ(kmp_strnstr(haystack1, "foo", 1), NULL);
 }
