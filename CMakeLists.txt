@@ -12,6 +12,9 @@ set(SOURCES
 add_executable(ssb src/main.c ${SOURCES})
 target_include_directories(ssb PRIVATE include ext/baro)
 
+target_compile_options(ssb PRIVATE -fsanitize=address,undefined)
+target_link_options(ssb PRIVATE -fsanitize=address,undefined)
+
 add_executable(test-ssb ext/baro/baro.c ${SOURCES})
 target_include_directories(test-ssb PRIVATE include ext/baro)
 target_compile_definitions(test-ssb PRIVATE BARO_ENABLE)
