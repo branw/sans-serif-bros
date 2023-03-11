@@ -87,7 +87,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
             "                           \\/_____/  \\/_/ /_/  \\/_____/  \\/_____/";
 
     // Pan the logo around
-    unsigned tick = (state->num_ticks % 16) / 4;
+    unsigned tick = (state->num_ticks % 32) / 8;
     int dx = tick == 1 || tick == 2 ? 1 : 0;
     int dy = tick == 2 || tick == 3 ? 1 : 0;
     canvas_write_block(&state->canvas, 7 + dx, 1 + dy, 65, 13, logo);
