@@ -5,22 +5,7 @@
 #include "env.h"
 #include "server.h"
 #include "screen.h"
-
-/*
- * Specific state handlers
- */
-
-/*
-static bool game_screen_update(struct state *state) {
-
-}
- */
-
-
-
-/*
- * State
- */
+#include "screens/title.h"
 
 bool state_create(struct state *state) {
     canvas_create(&state->canvas, 80, 25);

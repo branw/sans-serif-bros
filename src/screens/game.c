@@ -2,7 +2,7 @@
 #include "../state.h"
 #include "../db.h"
 #include "../screen.h"
-
+#include "game.h"
 
 struct screen_impl game_screen_impl = {
         .update = game_screen_update

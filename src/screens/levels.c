@@ -3,6 +3,8 @@
 #include "../db.h"
 #include "../state.h"
 #include "../screen.h"
+#include "levels.h"
+#include "game.h"
 
 struct screen_impl level_pit_screen_impl = {
         .update=level_pit_screen_update

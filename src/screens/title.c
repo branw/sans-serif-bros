@@ -5,6 +5,9 @@
 #include "../screen.h"
 #include "../server.h"
 #include "../telnet.h"
+#include "title.h"
+#include "game.h"
+#include "levels.h"
 
 struct screen_impl title_screen_impl = {
         .update=title_screen_update,
@@ -45,7 +48,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
         switch (screen->selection) {
             // classic mode
             case 0:
-                state_push_screen(state, game_screen_create(env, 1));
+                state_push_screen(state, game_screen_create(env, 166));
                 return true;
 
             // level pit
