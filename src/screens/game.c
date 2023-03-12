@@ -1,7 +1,7 @@
 #include <stdlib.h>
-#include "state.h"
-#include "db.h"
-#include "screen.h"
+#include "../state.h"
+#include "../db.h"
+#include "../screen.h"
 
 
 struct screen_impl game_screen_impl = {

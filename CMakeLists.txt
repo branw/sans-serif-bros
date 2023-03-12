@@ -9,7 +9,7 @@ set(SOURCES
         src/screens/title.c src/screens/levels.c src/screens/game.c)
 
 add_executable(ssb src/main.c ${SOURCES})
-target_include_directories(ssb PRIVATE include ext/baro)
+target_include_directories(ssb PRIVATE src ext/baro)
 
 target_compile_options(ssb PRIVATE -fsanitize=address,undefined)
 target_link_options(ssb PRIVATE -fsanitize=address,undefined)

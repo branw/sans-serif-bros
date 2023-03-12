@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "state.h"
-#include "db.h"
-#include "screen.h"
-#include "server.h"
-#include "telnet.h"
+#include "../state.h"
+#include "../db.h"
+#include "../screen.h"
+#include "../server.h"
+#include "../telnet.h"
 
 struct screen_impl title_screen_impl = {
         .update=title_screen_update,

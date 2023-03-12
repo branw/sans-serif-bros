@@ -1,8 +1,8 @@
 #include <stdlib.h>
-#include "util.h"
-#include "db.h"
-#include "state.h"
-#include "screen.h"
+#include "../util.h"
+#include "../db.h"
+#include "../state.h"
+#include "../screen.h"
 
 struct screen_impl level_pit_screen_impl = {
         .update=level_pit_screen_update
