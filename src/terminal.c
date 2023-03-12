@@ -21,12 +21,39 @@ void terminal_destroy(struct terminal *terminal) {
 
 }
 
-static void parse_telnet_command(struct terminal *terminal, char **buf, size_t *len) {
+static bool parse_u16(char **buf, size_t *len, uint16_t *out) {
+    if (**buf == '\xff') {
+        if (*len < 2) {
+            return false;
+        }
+        *buf++;
+        *len--;
+    }
+
+    uint16_t result = (uint8_t)**buf << 8;
+
+    if ((*buf)[1] == '\xff') {
+        if (*len < 3) {
+            return false;
+        }
+        *buf++;
+        *len--;
+    }
+    result |= (uint8_t)((*buf)[1]);
+
+    *buf += 2;
+    *len -= 2;
+
+    *out = result;
+    return true;
+}
+
+static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *len) {
     // Escaped chr 255, which we don't care about
     if ((*buf)[1] == *IAC) {
         *buf += 2;
         *len -= 2;
-        return;
+        return true;
     }
 
     // Negotiations:
@@ -39,23 +66,44 @@ static void parse_telnet_command(struct terminal *terminal, char **buf, size_t *
             terminal->will_naws = ((*buf)[1] == *WILL);
         }
 
+        printf("Telnet negotiation %s %d\n",
+               (*buf)[1] == *WILL ? "WILL" :
+               (*buf)[1] == *WONT ? "WONT" :
+               (*buf)[1] == *DO ? "DO" :
+               (*buf)[1] == *DONT ? "DONT" : "???",
+               (*buf)[2]);
+
         *buf += 3;
         *len -= 3;
-        return;
+        return true;
     }
 
     // Sub-options:
     // IAC SB <option> <values...> IAC SE
     if (*len >= 5 && (*buf)[1] == *SB) {
         if ((*buf)[2] == *NAWS) {
-            char const *end = kmp_strnstr(&(*buf)[2], IAC SE, *len - 2);
-            if (end == NULL) {
-                return;
+            char *original_buf = *buf;
+            size_t original_len = *len;
+            *buf += 3;
+            *len -= 3;
+
+            uint16_t cols = 0, rows = 0;
+            if (!parse_u16(buf, len, &cols) || !parse_u16(buf, len, &rows) ||
+                    ((*buf)[0] != *IAC && (*buf)[1] != *SE)) {
+                *buf = original_buf;
+                *len = original_len;
+                return false;
             }
 
-            //TODO
+            printf("NAWS: %d cols, %d rows\n", cols, rows);
+
+            canvas_resize(terminal->canvas, SSB_MAX(cols, 80), SSB_MAX(rows, 25));
+
+            return true;
         }
     }
+
+    return false;
 }
 
 void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
@@ -99,7 +147,9 @@ void terminal_parse(struct terminal *terminal, char *buf, size_t len) {
         }
         // Telnet command
         else if (ch == *IAC && len >= 2) {
-            parse_telnet_command(terminal, &buf, &len);
+            if (parse_telnet_command(terminal, &buf, &len)) {
+                continue;
+            }
         }
 
         buf++;

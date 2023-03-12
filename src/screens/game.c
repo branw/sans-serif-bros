@@ -92,8 +92,10 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_background(&state->canvas, black);
     }
 
-    // Draw the game field
-    canvas_write_block_utf32(&state->canvas, 0, 0, 80, 25,
+    // Draw the game field in the center of the canvas
+    unsigned int const x_offset = (state->canvas.w - 80) / 2;
+    unsigned int const y_offset = (state->canvas.h - 25) / 2;
+    canvas_write_block_utf32(&state->canvas, x_offset, y_offset, 80, 25,
                              (uint32_t *) screen->game.field, ROWS * COLUMNS);
 
     // Color individual cells
@@ -125,7 +127,7 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
 
                     default: continue;
                 }
-                canvas_put(&state->canvas, x, y, ch);
+                canvas_put(&state->canvas, x_offset + x, y_offset + y, ch);
             }
         }
     }
@@ -135,17 +137,17 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_foreground(&state->canvas, red);
         canvas_background(&state->canvas, black);
 
-        canvas_fill(&state->canvas, 29, 9, 22, 7, ' ');
-        canvas_rect(&state->canvas, 30, 10, 20, 5, '#');
-        canvas_write(&state->canvas, 32, 12, "press R to retry");
+        canvas_fill(&state->canvas, x_offset + 29, y_offset + 9, 22, 7, ' ');
+        canvas_rect(&state->canvas, x_offset + 30, y_offset + 10, 20, 5, '#');
+        canvas_write(&state->canvas, x_offset + 32, y_offset + 12, "press R to retry");
     }
     else if (screen->game.win && state->num_ticks % 20 < 10) {
         canvas_foreground(&state->canvas, green);
         canvas_background(&state->canvas, black);
 
-        canvas_fill(&state->canvas, 26, 9, 29, 7, ' ');
-        canvas_rect(&state->canvas, 27, 10, 27, 5, '#');
-        canvas_write(&state->canvas, 29, 12, "press space to continue");
+        canvas_fill(&state->canvas, x_offset + 26, y_offset + 9, 29, 7, ' ');
+        canvas_rect(&state->canvas, x_offset + 27, y_offset + 10, 27, 5, '#');
+        canvas_write(&state->canvas, x_offset + 29, y_offset + 12, "press space to continue");
     }
 
     // Resend the entire canvas every so many ticks

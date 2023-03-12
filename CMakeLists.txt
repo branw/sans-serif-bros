@@ -3,7 +3,6 @@ project(ssb C)
 
 set(CMAKE_C_STANDARD 11)
 
-
 set(SOURCES
         src/server.c src/session.c src/state.c src/terminal.c src/game.c
         src/util.c src/canvas.c src/db.c src/screen.c

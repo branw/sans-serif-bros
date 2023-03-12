@@ -52,6 +52,8 @@ bool state_push_screen(struct state *state, struct screen *screen) {
 
     KEYBOARD_CLEAR(state->terminal.keyboard);
 
+    canvas_erase(&state->canvas);
+
     state->screens[state->num_screens++] = screen;
     return true;
 }

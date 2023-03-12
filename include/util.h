@@ -1,8 +1,10 @@
 #ifndef SSB_UTIL_H
 #define SSB_UTIL_H
 
-// Reimplementation of MIN to avoid stomping over MSVC's definition
+// Reimplementation of MIN/MAX to avoid stomping over MSVC's definition
+
 #define SSB_MIN(A, B) ((A) > (B) ? (B) : (A))
+#define SSB_MAX(A, B) ((A) < (B) ? (B) : (A))
 
 unsigned long utf8_decode(char **s);
 

@@ -52,6 +52,10 @@ void canvas_resize(struct canvas *canvas, unsigned w, unsigned h) {
 
     // Free the existing canvas
     canvas_destroy(&old);
+
+    // Interrupt the current flush
+    canvas->flush_index = 0;
+    canvas_force_next_flush(canvas);
 }
 
 void canvas_erase(struct canvas *canvas) {

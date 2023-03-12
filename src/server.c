@@ -32,6 +32,10 @@ bool server_create(struct server *server, char *service) {
         return false;
     }
 
+    // Allow port hijacking until we fix socket cleanup
+    int opt_val = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &opt_val, sizeof(opt_val));
+
     // Bind the socket to the address
     result = bind(sock, addr->ai_addr, (int) addr->ai_addrlen);
     freeaddrinfo(addr);

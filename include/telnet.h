@@ -1,20 +1,21 @@
 #ifndef SSB_TELNET_H
 #define SSB_TELNET_H
 
-#define ESC "\x1b"
+#define ESC "\x1b" // 13
 
-#define ECHO "\x01"
-#define SUPPRESS_GO_AHEAD "\x03"
-#define NAWS "\x1f"
+#define ECHO "\x01" // 1
+#define SUPPRESS_GO_AHEAD "\x03" // 3
+#define NAWS "\x1f" // 31
+#define TERMINAL_SPEED "\x20" // 32
 
 #define CSI ESC "["
 
-#define IAC  "\xff"
-#define DONT "\xfe"
-#define DO   "\xfd"
-#define WONT "\xfc"
-#define WILL "\xfb"
-#define SB   "\xfa"
+#define IAC  "\xff" // 255
+#define DONT "\xfe" // 254
+#define DO   "\xfd" // 253
+#define WONT "\xfc" // 252
+#define WILL "\xfb" // 251
+#define SB   "\xfa" // 250
 #define GA   "\xf9"
 #define EL   "\xf8"
 #define EC   "\xf7"
