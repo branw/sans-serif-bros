@@ -14,16 +14,18 @@ enum color {
     blue = 4,
     magenta = 5,
     cyan = 6,
-    white = 7
+    white = 7,
+
+    default_color = 9,
 };
 
 struct cell {
     uint32_t code_point : 21;
-    uint32_t italic : 1;
-    uint32_t underline : 1;
-    uint32_t blink : 1;
-    enum color foreground : 3;
-    enum color background : 3;
+//    uint32_t italic : 1;
+//    uint32_t underline : 1;
+//    uint32_t blink : 1;
+    enum color foreground : 4;
+    enum color background : 4;
     uint32_t bold : 1;
 };
 
@@ -31,13 +33,13 @@ _Static_assert(sizeof(struct cell) == sizeof(uint32_t),
         "Canvas cell should fit in 32 bits");
 
 // Zero out a cell
-#define CANVAS_CELL_CLEAR(cell) do { (cell).code_point = 0; (cell).italic = false; \
-        (cell).underline = false; (cell).blink = false; (cell).foreground = black; \
+#define CANVAS_CELL_CLEAR(cell) do { (cell).code_point = 0; /*(cell).italic = false;*/ \
+        /*(cell).underline = false; (cell).blink = false;*/ (cell).foreground = black; \
         (cell).background = black; (cell).bold = false; } while (0)
 
-#define CANVAS_CELL_STYLE_EQ(a, b) ((a).italic == (b).italic && \
-    (a).underline == (b).underline && (a).blink == (b).blink && (a).bold == (b).bold && \
-    (a).foreground == (b).foreground && (a).background == (b).background && (a).bold == (b).bold)
+#define CANVAS_CELL_STYLE_EQ(a, b) (/*(a).italic == (b).italic &&*/ \
+    /*(a).underline == (b).underline && (a).blink == (b).blink &&*/ (a).bold == (b).bold && \
+    (a).foreground == (b).foreground && (a).background == (b).background)
 
 // Check if two cells are equivalent
 #define CANVAS_CELL_EQ(a, b) ((a).code_point == (b).code_point && CANVAS_CELL_STYLE_EQ((a), (b)))
@@ -84,11 +86,11 @@ void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
 
 void canvas_reset(struct canvas *canvas);
 
-void canvas_italic(struct canvas *canvas, bool state);
-
-void canvas_underline(struct canvas *canvas, bool state);
-
-void canvas_blink(struct canvas *canvas, bool state);
+//void canvas_italic(struct canvas *canvas, bool state);
+//
+//void canvas_underline(struct canvas *canvas, bool state);
+//
+//void canvas_blink(struct canvas *canvas, bool state);
 
 void canvas_bold(struct canvas *canvas, bool state);
 

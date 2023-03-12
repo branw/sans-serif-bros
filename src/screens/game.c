@@ -88,8 +88,8 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_background(&state->canvas, red);
     }
     else if (color) {
-        canvas_foreground(&state->canvas, white);
-        canvas_background(&state->canvas, black);
+        canvas_foreground(&state->canvas, default_color);
+        canvas_background(&state->canvas, default_color);
     }
 
     // Draw the game field in the center of the canvas
@@ -105,13 +105,13 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
                 unsigned long ch = screen->game.field[y][x];
                 switch (ch) {
                     case 'I':
-                        canvas_foreground(&state->canvas, black);
+                        canvas_foreground(&state->canvas, white);
                         canvas_background(&state->canvas, blue);
                         break;
 
                     case 0xa3:
                     case 'E':
-                        canvas_foreground(&state->canvas, black);
+                        canvas_foreground(&state->canvas, white);
                         canvas_background(&state->canvas, green);
                         break;
 
@@ -121,7 +121,7 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
                     case '}':
                     case 'X':
                     case '%':
-                        canvas_foreground(&state->canvas, black);
+                        canvas_foreground(&state->canvas, white);
                         canvas_background(&state->canvas, red);
                         break;
 

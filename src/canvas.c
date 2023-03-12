@@ -291,24 +291,22 @@ void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
 }
 
 void canvas_reset(struct canvas *canvas) {
-    // 3-bit colors means that we can't represent the default color and instead
-    // must create our own; this at least gives some consistency across themes
     CANVAS_CELL_CLEAR(canvas->style);
-    canvas->style.background = black;
-    canvas->style.foreground = white;
+    canvas->style.background = default_color;
+    canvas->style.foreground = default_color;
 }
 
-void canvas_italic(struct canvas *canvas, bool state) {
-    canvas->style.italic = state ? true : false;
-}
-
-void canvas_underline(struct canvas *canvas, bool state) {
-    canvas->style.underline = state ? true : false;
-}
-
-void canvas_blink(struct canvas *canvas, bool state) {
-    canvas->style.blink = state ? true : false;
-}
+//void canvas_italic(struct canvas *canvas, bool state) {
+//    canvas->style.italic = state ? true : false;
+//}
+//
+//void canvas_underline(struct canvas *canvas, bool state) {
+//    canvas->style.underline = state ? true : false;
+//}
+//
+//void canvas_blink(struct canvas *canvas, bool state) {
+//    canvas->style.blink = state ? true : false;
+//}
 
 void canvas_bold(struct canvas *canvas, bool state) {
     canvas->style.bold = state ? true : false;
