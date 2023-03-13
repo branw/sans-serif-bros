@@ -411,7 +411,7 @@ static void process_frame_1(struct game *state) {
                     if (y < ROWS - 1) {
                         int d = (ch == '[' || ch == '{') ? -1 : 1;
                         bool gr = (ch == '[' || ch == ']');
-                        unsigned long od = (char) ((d > 0) ? (gr ? '[' : '{') : (gr ? ']' : '}'));
+                        unsigned long od = (unsigned char) ((d > 0) ? (gr ? '[' : '{') : (gr ? ']' : '}'));
 
                         unsigned long fl = state->field[y + 1][x];
                         if (!(gr && (fl == '(' || fl == ')'))) {

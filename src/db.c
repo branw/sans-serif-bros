@@ -504,7 +504,7 @@ bool db_create(struct db *db, char *path) {
     // If a level is on disk but not in the metadata: add it
     // If a level is in the metadata but not on disk: fail hard
 
-    // Loop over all of the fields without caring about order
+    // Loop over all the fields without caring about order
     DIR *dir = opendir(path);
     if (!dir) {
         fprintf(stderr, "failed to open level directory \"%s\"\n", path);
