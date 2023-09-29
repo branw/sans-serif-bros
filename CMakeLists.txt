@@ -18,5 +18,8 @@ add_executable(test-ssb ext/baro/baro.c ${SOURCES})
 target_include_directories(test-ssb PRIVATE include ext/baro)
 target_compile_definitions(test-ssb PRIVATE BARO_ENABLE)
 
+target_compile_options(test-ssb PRIVATE -fsanitize=address,undefined)
+target_link_options(test-ssb PRIVATE -fsanitize=address,undefined)
+
 enable_testing()
 add_test(ssb test-ssb)

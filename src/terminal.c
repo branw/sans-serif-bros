@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <baro.h>
 #include "terminal.h"
 #include "session.h"
 #include "telnet.h"
@@ -21,23 +22,26 @@ void terminal_destroy(struct terminal *terminal) {
 
 }
 
-static bool parse_u16(char **buf, size_t *len, uint16_t *out) {
+// Parse a 16-bit value from the buffer. This obviously requires at least
+// 2 bytes, but may require up to 4 as 0xFF/IAC must be escaped.
+static bool parse_escaped_u16(char **buf, size_t *len, uint16_t *out) {
     if (**buf == '\xff') {
-        if (*len < 2) {
+        // 0xFF only makes sense when it's doubled/escaped
+        if (*len < 2 || (*buf)[1] != '\xff') {
             return false;
         }
-        *buf++;
-        *len--;
+        *buf += 1;
+        *len -= 1;
     }
 
     uint16_t result = (uint8_t)**buf << 8;
 
     if ((*buf)[1] == '\xff') {
-        if (*len < 3) {
+        if (*len < 3 || (*buf)[2] != '\xff') {
             return false;
         }
-        *buf++;
-        *len--;
+        *buf += 1;
+        *len -= 1;
     }
     result |= (uint8_t)((*buf)[1]);
 
@@ -46,6 +50,54 @@ static bool parse_u16(char **buf, size_t *len, uint16_t *out) {
 
     *out = result;
     return true;
+}
+
+TEST("[terminal] parse_escaped_u16") {
+    {
+        uint8_t data[2] = {0x43, 0x21};
+
+        char *buf = (char *) data;
+        size_t len = 2;
+        uint16_t out = 0x1337;
+        REQUIRE(parse_escaped_u16(&buf, &len, &out));
+        REQUIRE_EQ(buf, &data[2]);
+        REQUIRE_EQ(len, 0);
+        REQUIRE_EQ(out, 0x4321);
+    }
+
+    // A single/un-escaped 0xFF is invalid
+    {
+        uint8_t data[3] = {0xff, 0x12, 0x34};
+
+        char *buf = (char *)data;
+        size_t len = 3;
+        uint16_t out = 0x1337;
+        REQUIRE_FALSE(parse_escaped_u16(&buf, &len, &out));
+    }
+
+    {
+        uint8_t data[4] = {0xff, 0xff, 0xff, 0xff};
+
+        char *buf = (char *) data;
+        size_t len = 4;
+        uint16_t out = 0x1337;
+        REQUIRE(parse_escaped_u16(&buf, &len, &out));
+        REQUIRE_EQ(buf, &data[4]);
+        REQUIRE_EQ(len, 0);
+        REQUIRE_EQ(out, 0xffff);
+    }
+
+    {
+        uint8_t data[3] = {0x12, 0xff, 0xff};
+
+        char *buf = (char *) data;
+        size_t len = 3;
+        uint16_t out = 0x1337;
+        REQUIRE(parse_escaped_u16(&buf, &len, &out));
+        REQUIRE_EQ(buf, &data[3]);
+        REQUIRE_EQ(len, 0);
+        REQUIRE_EQ(out, 0x12ff);
+    }
 }
 
 static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *len) {
@@ -88,7 +140,7 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
             *len -= 3;
 
             uint16_t cols = 0, rows = 0;
-            if (!parse_u16(buf, len, &cols) || !parse_u16(buf, len, &rows) ||
+            if (!parse_escaped_u16(buf, len, &cols) || !parse_escaped_u16(buf, len, &rows) ||
                     ((*buf)[0] != *IAC && (*buf)[1] != *SE)) {
                 *buf = original_buf;
                 *len = original_len;
