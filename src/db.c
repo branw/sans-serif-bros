@@ -434,7 +434,7 @@ static bool store_metadata(struct db *db) {
 // Load a level's field from a file
 static bool load_level(struct db *db, struct level *level) {
     char field_path[1024];
-    sprintf(field_path, "%s/%d.txt", db->path, level->metadata.id);
+    snprintf(field_path, sizeof(field_path), "%s/%d.txt", db->path, level->metadata.id);
 
     FILE *field_file = fopen(field_path, "rb+");
     if (!field_file) {
@@ -446,7 +446,7 @@ static bool load_level(struct db *db, struct level *level) {
     // encoded in UTF-8 with proper line endings. This is where we pay the tax
 
     char buffer[8096] = {0};
-    fread(buffer, sizeof(char), 8096, field_file);
+    fread(buffer, sizeof(char), sizeof(buffer), field_file);
 
     level->field = calloc(80 * 25, sizeof(uint32_t));
 

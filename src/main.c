@@ -12,6 +12,9 @@
 #define USAGE "usage: ssb [-hvs] [-d path/to/db] [-p port]\n"
 #define VERSION "0.1"
 
+#define DEFAULT_PORT "23"
+#define DEFAULT_DB_PATH "ssb.sqlite"
+
 struct termios orig_termios;
 
 volatile sig_atomic_t running = true;
@@ -93,7 +96,7 @@ int run_server(struct db *db, char *service) {
     // Launch the server
     struct server server;
     if (!server_create(&server, service)) {
-        fprintf(stderr, "failed to create server\n");
+        fprintf(stderr, "Failed to create server\n");
 
         return EXIT_FAILURE;
     }
@@ -120,9 +123,9 @@ int run_server(struct db *db, char *service) {
                     session_send(session, buf, len);
                 }
             }
-                // The connection was already disconnected or should be disconnected
+            // The connection was already disconnected or should be disconnected
             else {
-                // Store the previous session so we don't break the iterator
+                // Store the previous session, so we don't break the iterator
                 struct session *prev = session->prev;
                 // Kill the connection
                 server_disconnect_session(&server, session);
@@ -139,12 +142,13 @@ int run_server(struct db *db, char *service) {
 }
 
 int main(int argc, char *argv[]) {
-    char *port = "telnet", *db_path = "levels";
+    char *port = DEFAULT_PORT;
+    char *db_path = DEFAULT_DB_PATH;
     bool standalone = false;
 
     // Parse command-line arguments
     int opt;
-    while ((opt = getopt(argc, argv, "hvd:p:s")) != -1) {
+    while ((opt = getopt(argc, argv, "hvd:l:p:s")) != -1) {
         switch (opt) {
             case 'd': {
                 db_path = optarg;
@@ -163,8 +167,9 @@ int main(int argc, char *argv[]) {
             case 'h': {
                 printf("ssb (sans serif bros) " VERSION " - a Telnet platformer\n"
                 USAGE
-                "    -d path         Directory of level data (default: \"levels\")\n"
-                "    -p port         Server port number or name (default: \"telnet\" (23))\n"
+                "    -d path         Path to database (default: \"" DEFAULT_DB_PATH "\")\n"
+                "    -l path         Path of levels to load (default: none)\n"
+                "    -p port         Server port number or name (default: \"" DEFAULT_PORT "\")\n"
                 "    -s              Disable the server and play locally only\n"
                 "    -h              Show this help message\n"
                 "    -v              Show the version\n");
@@ -184,13 +189,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Load the level metadata
-    struct db db;
-    if (!db_create(&db, db_path)) {
-        fprintf(stderr, "failed to create db\n");
+    if (standalone && !strncmp(port, DEFAULT_PORT, sizeof(DEFAULT_PORT))) {
+        fprintf(stderr, "Port cannot be specified in standalone mode\n");
         return EXIT_FAILURE;
     }
 
+    // Load the level metadata
+    struct db db;
+    if (!db_create(&db, db_path)) {
+        fprintf(stderr, "Failed to create db\n");
+        return EXIT_FAILURE;
+    }
+
+    // Install a signal handler to gracefully shutdown
     struct sigaction action;
     memset(&action, 0, sizeof(struct sigaction));
     action.sa_handler = handle_signal;

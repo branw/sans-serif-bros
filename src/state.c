@@ -32,6 +32,7 @@ void state_set_tick_ms(struct state *state, long long tick_ms) {
 
 bool state_push_screen(struct state *state, struct screen *screen) {
     if (state->num_screens == MAX_SCREENS) {
+        fprintf(stderr, "Screen limit reached\n");
         return false;
     }
 
