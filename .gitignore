@@ -4,4 +4,8 @@
 ssb
 test-ssb
 
+ssb.sqlite
+
 cmake-build-*/
+Testing/
+vcpkg_installed/

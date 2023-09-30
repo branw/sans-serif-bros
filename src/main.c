@@ -14,6 +14,7 @@
 
 #define DEFAULT_PORT "23"
 #define DEFAULT_DB_PATH "ssb.sqlite"
+#define DEFAULT_LEVEL_PATH "levels"
 
 struct termios orig_termios;
 
@@ -75,15 +76,14 @@ int run_standalone(struct db *db) {
             terminal_parse(&state.terminal, buf, read_len);
         }
 
-        if (state_update(&state, &env)) {
-            // Flush and send output data
-            size_t write_len;
-            while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
-                write(STDOUT_FILENO, buf, write_len);
-            }
-        }
-        else {
+        if (!state_update(&state, &env)) {
             running = false;
+        }
+
+        // Flush and send output data
+        size_t write_len;
+        while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
+            write(STDOUT_FILENO, buf, write_len);
         }
     }
 
@@ -117,14 +117,17 @@ int run_server(struct db *db, char *service) {
             }
 
             // Try to update the state
-            if (alive && state_update(session->state, &env)) {
-                // Flush and send output data
+            bool const keep_alive = state_update(session->state, &env);
+            if (alive) {
+                // Flush and send output data, even when we're about to close
+                // the connection
                 while (terminal_flush(&session->state->terminal, buf, 512, &len)) {
                     session_send(session, buf, len);
                 }
             }
             // The connection was already disconnected or should be disconnected
-            else {
+            if (!alive || !keep_alive) {
+                printf("Disconnecting\n");
                 // Store the previous session, so we don't break the iterator
                 struct session *prev = session->prev;
                 // Kill the connection
@@ -144,6 +147,7 @@ int run_server(struct db *db, char *service) {
 int main(int argc, char *argv[]) {
     char *port = DEFAULT_PORT;
     char *db_path = DEFAULT_DB_PATH;
+    char *levels_path = DEFAULT_LEVEL_PATH;
     bool standalone = false;
 
     // Parse command-line arguments
@@ -152,6 +156,11 @@ int main(int argc, char *argv[]) {
         switch (opt) {
             case 'd': {
                 db_path = optarg;
+                break;
+            }
+
+            case 'l': {
+                levels_path = optarg;
                 break;
             }
 
@@ -168,7 +177,7 @@ int main(int argc, char *argv[]) {
                 printf("ssb (sans serif bros) " VERSION " - a Telnet platformer\n"
                 USAGE
                 "    -d path         Path to database (default: \"" DEFAULT_DB_PATH "\")\n"
-                "    -l path         Path of levels to load (default: none)\n"
+                "    -l path         Path of levels to load for new databases (default: \"" DEFAULT_LEVEL_PATH "\")\n"
                 "    -p port         Server port number or name (default: \"" DEFAULT_PORT "\")\n"
                 "    -s              Disable the server and play locally only\n"
                 "    -h              Show this help message\n"
@@ -196,7 +205,7 @@ int main(int argc, char *argv[]) {
 
     // Load the level metadata
     struct db db;
-    if (!db_create(&db, db_path)) {
+    if (!db_create(&db, db_path, levels_path)) {
         fprintf(stderr, "Failed to create db\n");
         return EXIT_FAILURE;
     }

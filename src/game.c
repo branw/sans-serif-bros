@@ -1,4 +1,5 @@
 #include <memory.h>
+#include <stdio.h>
 #include "game.h"
 #include "util.h"
 
@@ -10,23 +11,39 @@
 #define LEFT (state->input.left)
 #define RIGHT (state->input.right)
 
-void game_create(struct game *game, uint32_t *stage) {
-    game->tick = 0;
-    game->win = game->die = game->no_money_left = false;
-    game->tired = 0;
+bool game_parse_and_validate_field(char *field_str, uint32_t *field) {
+    int row = 0;
+    int column = 0;
+    while (*field_str != '\0') {
+        uint32_t code_point = utf8_decode(&field_str);
+        if (code_point == '\n') {
+            column = 0;
+            row += 1;
+        } else if (code_point == '\r') {
+            continue;
+        } else {
+            if (row >= ROWS) {
+                fprintf(stderr, "Bad level: too many rows\n");
+                return false;
+            } else if (column >= COLUMNS) {
+                fprintf(stderr, "Bad level: too many columns in row %d\n", row);
+                return false;
+            }
 
-    memcpy(game->field, stage, ROWS * COLUMNS * sizeof(uint32_t));
+            field[row * COLUMNS + column] = code_point;
+            column += 1;
+        }
+    }
+
+    return true;
 }
 
-void game_create_from_utf8(struct game *game, char *stage) {
+bool game_create_from_utf8(struct game *game, char *field_str) {
     game->tick = 0;
     game->win = game->die = game->no_money_left = false;
     game->tired = 0;
 
-    unsigned long *field = (unsigned long *) game->field;
-    while (*stage) {
-        *field++ = utf8_decode(&stage);
-    }
+    return game_parse_and_validate_field(field_str, (uint32_t *) game->field);
 }
 
 static void replace(struct game *state, unsigned long from, unsigned long to) {

@@ -118,7 +118,7 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
             terminal->will_naws = ((*buf)[1] == *WILL);
         }
 
-        printf("Telnet negotiation %s %d\n",
+        printf("Received Telnet negotiation: %s <%d>\n",
                (*buf)[1] == *WILL ? "WILL" :
                (*buf)[1] == *WONT ? "WONT" :
                (*buf)[1] == *DO ? "DO" :
@@ -147,7 +147,7 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
                 return false;
             }
 
-            printf("NAWS: %d cols, %d rows\n", cols, rows);
+            printf("Received NAWS: %d cols, %d rows\n", cols, rows);
 
             canvas_resize(terminal->canvas, SSB_MAX(cols, 80), SSB_MAX(rows, 25));
 

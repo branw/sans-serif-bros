@@ -18,9 +18,9 @@ struct game {
     struct directional_input input;
 };
 
-void game_create(struct game *game, uint32_t *stage);
+bool game_parse_and_validate_field(char *field_str, uint32_t *field);
 
-void game_create_from_utf8(struct game *game, char *stage);
+bool game_create_from_utf8(struct game *game, char *stage);
 
 void game_update(struct game *game, struct directional_input *input);
 

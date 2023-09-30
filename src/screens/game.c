@@ -9,15 +9,15 @@ struct screen_impl game_screen_impl = {
 };
 
 struct game_screen_state {
-    int level_id;
+    uint32_t level_id;
     struct game game;
 
     int transition_ticks;
 };
 
-struct screen *game_screen_create(struct env *env, int level_id) {
+struct screen *game_screen_create(struct env *env, uint32_t level_id) {
     struct screen *screen = malloc(sizeof(struct screen) + sizeof(struct game_screen_state));
-    *(struct game_screen_state *)screen->data = (struct game_screen_state){
+    *(struct game_screen_state *)(screen->data) = (struct game_screen_state){
             .level_id = level_id,
             .game = {0},
             .transition_ticks = -1,
@@ -25,13 +25,18 @@ struct screen *game_screen_create(struct env *env, int level_id) {
     screen->impl = &game_screen_impl;
 
     // Load the level from the database
-    struct level *level;
-    if (!db_get_level(env->db, level_id, &level)) {
+    char *field = NULL;
+    if (!db_get_level_field_utf8(env->db, level_id, &field)) {
         printf("failed to get level!\n");
         return false;
     }
 
-    game_create(&((struct game_screen_state *)screen->data)->game, level->field);
+    if (!game_create_from_utf8(&((struct game_screen_state *)screen->data)->game, field)) {
+        fprintf(stderr, "Failed to create game\n");
+        return false;
+    }
+
+    free(field);
 
     return screen;
 }
@@ -44,13 +49,18 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
 
     // Handle inputs
     if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
-        struct level *level;
-        if (!db_get_level(env->db, screen->level_id, &level)) {
-            printf("failed to get level!\n");
+        char *field = NULL;
+        if (!db_get_level_field_utf8(env->db, screen->level_id, &field)) {
+            fprintf(stderr, "Failed to get level!\n");
             return false;
         }
 
-        game_create(&screen->game, level->field);
+        if (!game_create_from_utf8(&screen->game, field)) {
+            fprintf(stderr, "Failed to create game\n");
+            return false;
+        }
+
+        free(field);
 
         color = false;
         canvas_foreground(&state->canvas, blue);
@@ -58,13 +68,18 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'Q')) {
         return false;
     } else if (state->terminal.keyboard.space && screen->game.win) {
-        struct level *level;
-        if (!db_get_level(env->db, ++screen->level_id, &level)) {
+        char *field = NULL;
+        if (!db_get_level_field_utf8(env->db, ++screen->level_id, &field)) {
             printf("failed to get level!\n");
             return false;
         }
 
-        game_create(&screen->game, level->field);
+        if (!game_create_from_utf8(&screen->game, field)) {
+            fprintf(stderr, "Failed to create game\n");
+            return false;
+        }
+
+        free(field);
 
         color = false;
         canvas_foreground(&state->canvas, green);

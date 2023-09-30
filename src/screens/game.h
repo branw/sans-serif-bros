@@ -6,7 +6,7 @@
 struct env;
 struct state;
 
-struct screen *game_screen_create(struct env *env, int level_id);
+struct screen *game_screen_create(struct env *env, uint32_t level_id);
 
 bool game_screen_update(void *data, struct state *state, struct env *env);
 

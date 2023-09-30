@@ -7,8 +7,8 @@
 
 #define KEYBOARD_KEY_PRESSED(input, key) \
     (key >= '0' && key <= '9' ? \
-        ((input).nums & (1 << ((key) - '0'))) == (1 << ((key) - '0')) : \
-        ((input).alphas & (1 << (((key) & 0xdf) - 'A'))) == (1 << (((key) & 0xdf) - 'A')))
+        ((input).nums & (1ul << ((key) - '0'))) == (1ul << ((key) - '0')) : \
+        ((input).alphas & (1ul << (((key) & 0xdf) - 'A'))) == (1ul << (((key) & 0xdf) - 'A')))
 
 #define KEYBOARD_F_KEY_PRESSED(input, key) \
     ((input).fs & (1 << (key)) == (1 << (key)))

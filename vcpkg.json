@@ -1,0 +1,7 @@
+{
+  "name": "sans-serif-bros",
+  "version": "0.1",
+  "dependencies": [
+    "sqlite3"
+  ]
+}

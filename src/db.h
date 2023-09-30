@@ -5,8 +5,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <sqlite3.h>
 
-struct __attribute__((__packed__)) metadata {
+struct metadata {
     // Number of the level, starting at 1 and not necessarily continuous,
     // considering the inclusion of recovered levels
     uint32_t id;
@@ -34,25 +35,24 @@ struct level {
     uint32_t *field;
 };
 
-struct node;
-
 struct db {
-    char *path;
-
-    uint32_t num_levels;
-    struct node *tree;
+    sqlite3 *db;
 };
 
-bool db_create(struct db *db, char *path);
+bool db_create(struct db *db, char *path, char *levels_path);
 
 void db_destroy(struct db *db);
 
-int db_get_metadata(struct db *db, uint32_t id, struct metadata **metadata, int count);
+int db_get_metadata(struct db *db, uint32_t id, struct metadata *metadata, int count);
+
+int db_get_previous_level(struct db *db, uint32_t before_id);
 
 int db_num_levels(struct db *db);
 
-bool db_get_level(struct db *db, uint32_t id, struct level **level);
+bool db_get_level_bounds(struct db *db, uint32_t *min_level, uint32_t *max_level);
 
-bool db_create_level(struct db *db, char *name, uint32_t *field, struct level **out);
+bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field);
+
+bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadata *metadata);
 
 #endif //SSB_DB_H

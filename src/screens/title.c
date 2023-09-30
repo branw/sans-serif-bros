@@ -60,12 +60,19 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
             case 2:
 
                 break;
+
+            // quit game
+            case 3:
+                terminal_reset(&state->terminal);
+                terminal_cursor(&state->terminal, true);
+                printf("resetting");
+                return false;
         }
     }
     else if (state->terminal.keyboard.up && screen->selection > 0) {
         screen->selection--;
     }
-    else if (state->terminal.keyboard.down && screen->selection < 2) {
+    else if (state->terminal.keyboard.down && screen->selection < 3) {
         screen->selection++;
     }
 
@@ -119,6 +126,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
     canvas_write(&state->canvas, x_offset + 33, y_offset + 17, "classic mode");
     canvas_write(&state->canvas, x_offset + 33, y_offset + 19, "level pit");
     canvas_write(&state->canvas, x_offset + 33, y_offset + 21, "instructions");
+    canvas_write(&state->canvas, x_offset + 33, y_offset + 23, "quit game");
 
     canvas_put(&state->canvas, x_offset + 30, y_offset + 17 + 2 * screen->selection, '>');
 
