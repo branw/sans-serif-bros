@@ -1,4 +1,3 @@
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <errno.h>
@@ -7,6 +6,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include "session.h"
+#include "log.h"
 
 bool session_create(struct session *session, int socket) {
     session->socket = socket;
@@ -28,7 +28,7 @@ void session_destroy(struct session *session) {
     // Prevent anymore sending on the socket
     int result = shutdown(session->socket, SHUT_WR);
     if (result == -1) {
-        fprintf(stderr, "shutdown failed (%d: %s)\n", errno, strerror(errno));
+        LOG_ERROR("shutdown failed (%d: %s)", errno, strerror(errno));
     }
 
     // Close the socket
@@ -45,7 +45,7 @@ bool session_receive(struct session *session, char *buf, size_t len, size_t *len
             return true;
         }
 
-        fprintf(stderr, "recv failed (%d: %s)\n", errno, strerror(errno));
+        LOG_ERROR("recv failed (%d: %s)", errno, strerror(errno));
         return false;
     }
     // The client disconnected
@@ -53,26 +53,46 @@ bool session_receive(struct session *session, char *buf, size_t len, size_t *len
         return false;
     }
 
-    printf("-> ");
-    for (ssize_t i = 0; i < recv_len; ++i) {
-        if (buf[i] >= 0x20 && buf[i] <= 0x7e) printf("%c", buf[i]);
-        else printf("\\x%02x", (unsigned char) buf[i]);
-    }
-    printf("\n");
-
     *len_written = (size_t) recv_len;
+
+    if (recv_len > 4095) {
+        LOG_WARN("Skipping logging received packet because it was too long (%d bytes)", recv_len);
+        return true;
+    }
+
+    char buffer[4096];
+    int written_len = snprintf(buffer, 4096, "-> ");
+    for (int i = 0; i < recv_len; ++i) {
+        if (buf[i] >= 0x20 && buf[i] <= 0x7e) {
+            written_len += snprintf(buffer + written_len, 4096 - written_len, "%c", buf[i]);
+        }else {
+            written_len += snprintf(buffer + written_len, 4096 - written_len, "\\x%02x", (uint8_t) buf[i]);
+        }
+    }
+    LOG_TRACE(buffer);
+
     return true;
 }
 
 void session_send(struct session *session, char *buf, size_t len) {
     if (send(session->socket, buf, (int) len, 0) == -1) {
-        fprintf(stderr, "send failed (%d: %s)\n", errno, strerror(errno));
+        LOG_ERROR("send failed (%d: %s)", errno, strerror(errno));
+        return;
     }
 
-    printf("<- ");
-    for (int i = 0; i < len; ++i) {
-        if (buf[i] >= 0x20 && buf[i] <= 0x7e) printf("%c", buf[i]);
-        else printf("\\x%02x", (unsigned char) buf[i]);
+    if (len > 4095) {
+        LOG_WARN("Skipping logging sent packet because it was too long (%d bytes)", len);
+        return;
     }
-    printf("\n");
+
+    char buffer[4096];
+    int written_len = snprintf(buffer, 4096, "<- ");
+    for (int i = 0; i < len; ++i) {
+        if (buf[i] >= 0x20 && buf[i] <= 0x7e) {
+            written_len += snprintf(buffer + written_len, 4096 - written_len, "%c", buf[i]);
+        }else {
+            written_len += snprintf(buffer + written_len, 4096 - written_len, "\\x%02x", (uint8_t) buf[i]);
+        }
+    }
+    LOG_TRACE(buffer);
 }

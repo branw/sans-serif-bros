@@ -5,6 +5,7 @@
 #include "../screen.h"
 #include "levels.h"
 #include "game.h"
+#include "log.h"
 
 struct screen_impl level_pit_screen_impl = {
         .update=level_pit_screen_update
@@ -52,7 +53,7 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     uint32_t min_id = 0;
     uint32_t max_id = 0;
     if (!db_get_level_bounds(env->db, &min_id, &max_id)) {
-        fprintf(stderr, "Failed to get level bounds\n");
+        LOG_ERROR("Failed to get level bounds");
         return false;
     }
 

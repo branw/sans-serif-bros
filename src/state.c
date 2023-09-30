@@ -6,6 +6,7 @@
 #include "server.h"
 #include "screen.h"
 #include "screens/title.h"
+#include "log.h"
 
 bool state_create(struct state *state) {
     canvas_create(&state->canvas, 80, 25);
@@ -32,7 +33,7 @@ void state_set_tick_ms(struct state *state, long long tick_ms) {
 
 bool state_push_screen(struct state *state, struct screen *screen) {
     if (state->num_screens == MAX_SCREENS) {
-        fprintf(stderr, "Screen limit reached\n");
+        LOG_ERROR("Screen limit reached");
         return false;
     }
 
@@ -54,6 +55,7 @@ struct screen *state_peek_screen(struct state *state) {
 
 struct screen *state_pop_screen(struct state *state) {
     if (state->num_screens == 0) {
+        LOG_ERROR("Tried to pop empty screen stack");
         return NULL;
     }
 

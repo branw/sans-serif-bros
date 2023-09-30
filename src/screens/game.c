@@ -3,6 +3,7 @@
 #include "../db.h"
 #include "../screen.h"
 #include "game.h"
+#include "log.h"
 
 struct screen_impl game_screen_impl = {
         .update = game_screen_update
@@ -27,12 +28,12 @@ struct screen *game_screen_create(struct env *env, uint32_t level_id) {
     // Load the level from the database
     char *field = NULL;
     if (!db_get_level_field_utf8(env->db, level_id, &field)) {
-        printf("failed to get level!\n");
+        LOG_ERROR("Failed to get level");
         return false;
     }
 
     if (!game_create_from_utf8(&((struct game_screen_state *)screen->data)->game, field)) {
-        fprintf(stderr, "Failed to create game\n");
+        LOG_ERROR("Failed to create game");
         return false;
     }
 
@@ -51,12 +52,12 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
         char *field = NULL;
         if (!db_get_level_field_utf8(env->db, screen->level_id, &field)) {
-            fprintf(stderr, "Failed to get level!\n");
+            LOG_ERROR("Failed to get level!");
             return false;
         }
 
         if (!game_create_from_utf8(&screen->game, field)) {
-            fprintf(stderr, "Failed to create game\n");
+            LOG_ERROR("Failed to create game");
             return false;
         }
 
@@ -70,12 +71,12 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     } else if (state->terminal.keyboard.space && screen->game.win) {
         char *field = NULL;
         if (!db_get_level_field_utf8(env->db, ++screen->level_id, &field)) {
-            printf("failed to get level!\n");
+            printf("failed to get level!");
             return false;
         }
 
         if (!game_create_from_utf8(&screen->game, field)) {
-            fprintf(stderr, "Failed to create game\n");
+            LOG_ERROR("Failed to create game");
             return false;
         }
 

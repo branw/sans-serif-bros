@@ -5,6 +5,7 @@
 #include "session.h"
 #include "telnet.h"
 #include "util.h"
+#include "log.h"
 
 bool terminal_create(struct terminal *terminal, struct canvas *canvas) {
     terminal->canvas = canvas;
@@ -111,6 +112,28 @@ TEST("[terminal] parse_escaped_u16") {
     }
 }
 
+char const *negotiable_option_names[256] = {
+        // Binary Transmission
+        [0] = "BINARY",
+        [1] = "ECHO",
+        // Suppress Go-Ahead: https://www.rfc-editor.org/rfc/rfc858.html
+        [3] = "SGA",
+        // Status: https://www.rfc-editor.org/rfc/rfc859.html
+        [5] = "STATUS",
+        // Terminal Type: https://www.rfc-editor.org/rfc/rfc1091.html
+        [24] = "TERMINAL-TYPE",
+        // Negotiate About Window Size: https://www.rfc-editor.org/rfc/rfc1073.html
+        [31] = "NAWS",
+        // Terminal Speed: https://www.rfc-editor.org/rfc/rfc1079.html
+        [32] = "TERMINAL-SPEED",
+        // Remote Flow Control: https://www.rfc-editor.org/rfc/rfc1372.html
+        [33] = "TOGGLE-FLOW-CONTROL",
+        // Line Mode: https://www.rfc-editor.org/rfc/rfc1184.html
+        [34] = "LINEMODE",
+        // New Environment Option: https://www.rfc-editor.org/rfc/rfc1572.html
+        [39] = "NEW-ENVIRON",
+};
+
 static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *len) {
     // Escaped chr 255, which we don't care about
     if ((*buf)[1] == *IAC) {
@@ -124,17 +147,19 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
     if (*len >= 3 &&
         ((*buf)[1] == *WILL || (*buf)[1] == *WONT ||
                 (*buf)[1] == *DO || (*buf)[1] == *DONT)) {
+        uint8_t action = (*buf)[1];
+        uint8_t option_code = (*buf)[2];
+
         // "Negotiate About Window Size"
-        if ((*buf)[2] == *NAWS) {
+        if (option_code == *NAWS) {
             terminal->will_naws = ((*buf)[1] == *WILL);
         }
 
-        printf("Received Telnet negotiation: %s <%u>\n",
-               (*buf)[1] == *WILL ? "WILL" :
-               (*buf)[1] == *WONT ? "WONT" :
-               (*buf)[1] == *DO ? "DO" :
-               (*buf)[1] == *DONT ? "DONT" : "???",
-               (uint8_t)((*buf)[2]));
+        char const *option_name = negotiable_option_names[option_code];
+        LOG_DEBUG("Received Telnet negotiation: IAC %s %s(%u)",
+                  action == *WILL ? "WILL" : action == *WONT ? "WONT" : action == *DO ? "DO" : action == *DONT ? "DONT" : "???",
+                  option_name == NULL ? "???" : option_name,
+                  (uint8_t) option_code);
 
         *buf += 3;
         *len -= 3;
@@ -159,11 +184,14 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
                 return false;
             }
 
-            printf("Received NAWS: %d cols, %d rows\n", cols, rows);
+            LOG_DEBUG("Received NAWS: %d cols, %d rows", cols, rows);
+
+            // The canvas must be at least 80x25 to render the game, so we
+            // blissfully ignore any smaller windows
             uint16_t clamped_cols = SSB_CLAMP(cols, COLUMNS, 200);
             uint16_t clamped_rows = SSB_CLAMP(rows, ROWS, 200);
             if (clamped_cols != cols || clamped_rows != rows) {
-                fprintf(stderr, "Clamping NAWS resolution (%d cols, %d rows) to %d cols, %d rows",
+                LOG_WARN("Clamping NAWS resolution (%d cols, %d rows) to %d cols, %d rows",
                         cols, rows, clamped_cols, clamped_rows);
             }
 

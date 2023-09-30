@@ -26,6 +26,9 @@ extern "C" {
     "Super Serif Bros. Telnet Edition\n\r" \
     "(commit " GIT_COMMIT_HASH " from " GIT_COMMIT_TIMESTAMP ")\n\r"
 
+// Minimum level of log lines to display in stdout
+#define MINIMUM_LOG_LEVEL LOG_LEVEL_DEBUG
+
 #ifdef __cplusplus
 }
 #endif

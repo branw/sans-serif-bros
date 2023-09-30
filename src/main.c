@@ -8,6 +8,7 @@
 #include "env.h"
 #include "db.h"
 #include "server.h"
+#include "log.h"
 
 #define USAGE "usage: ssb [-hvs] [-d path/to/db] [-p port]\n"
 #define VERSION "0.1"
@@ -21,7 +22,7 @@ struct termios orig_termios;
 volatile sig_atomic_t running = true;
 
 void handle_signal(int signal_num) {
-    fprintf(stderr, "Got signal %d\n", signal_num);
+    LOG_DEBUG("Got signal %d", signal_num);
 
     running = false;
 }
@@ -87,7 +88,7 @@ int run_standalone(struct db *db) {
         }
     }
 
-    printf("Shutting down standalone mode...\n");
+    LOG_INFO("Shutting down standalone mode...");
 
     return EXIT_SUCCESS;
 }
@@ -96,7 +97,7 @@ int run_server(struct db *db, char *service) {
     // Launch the server
     struct server server;
     if (!server_create(&server, service)) {
-        fprintf(stderr, "Failed to create server\n");
+        LOG_ERROR("Failed to create server");
 
         return EXIT_FAILURE;
     }
@@ -127,7 +128,6 @@ int run_server(struct db *db, char *service) {
             }
             // The connection was already disconnected or should be disconnected
             if (!alive || !keep_alive) {
-                printf("Disconnecting\n");
                 // Store the previous session, so we don't break the iterator
                 struct session *prev = session->prev;
                 // Kill the connection
@@ -137,7 +137,7 @@ int run_server(struct db *db, char *service) {
         }
     }
 
-    printf("Shutting down server...\n");
+    LOG_INFO("Shutting down server...");
 
     server_destroy(&server);
 
@@ -199,14 +199,14 @@ int main(int argc, char *argv[]) {
     }
 
     if (standalone && !strncmp(port, DEFAULT_PORT, sizeof(DEFAULT_PORT))) {
-        fprintf(stderr, "Port cannot be specified in standalone mode\n");
+        LOG_ERROR("Port cannot be specified in standalone mode");
         return EXIT_FAILURE;
     }
 
     // Load the level metadata
     struct db db;
     if (!db_create(&db, db_path, levels_path)) {
-        fprintf(stderr, "Failed to create db\n");
+        LOG_ERROR("Failed to create DB");
         return EXIT_FAILURE;
     }
 
@@ -218,11 +218,11 @@ int main(int argc, char *argv[]) {
 
     int rc = standalone ? run_standalone(&db) : run_server(&db, port);
 
-    printf("Saving database\n");
+    LOG_INFO("Saving database");
 
     db_destroy(&db);
 
-    printf("Shutdown complete\n");
+    LOG_INFO("Shutdown complete");
 
     return rc;
 }

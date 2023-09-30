@@ -8,6 +8,7 @@
 #include "title.h"
 #include "game.h"
 #include "levels.h"
+#include "log.h"
 
 struct screen_impl title_screen_impl = {
         .update=title_screen_update,
@@ -43,7 +44,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
 
     // Handle input
     if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
-        printf("Changing: %d %d\n", state->terminal.keyboard.space, state->terminal.keyboard.enter);
+        LOG_DEBUG("Changing: %d %d", state->terminal.keyboard.space, state->terminal.keyboard.enter);
 
         switch (screen->selection) {
             // classic mode
@@ -63,9 +64,10 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
 
             // quit game
             case 3:
+                // Clean up the terminal before we kill the connection
                 terminal_reset(&state->terminal);
                 terminal_cursor(&state->terminal, true);
-                printf("resetting");
+
                 return false;
         }
     }
@@ -121,7 +123,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
     else {
         canvas_write(&state->canvas, x_offset + 4, y_offset + 13, "single-player mode");
     }
-    canvas_write(&state->canvas, x_offset + 4, y_offset + 14, "last updated 2020-5-29");
+    canvas_write(&state->canvas, x_offset + 4, y_offset + 14, "last updated 2023-09-30");
 
     canvas_write(&state->canvas, x_offset + 33, y_offset + 17, "classic mode");
     canvas_write(&state->canvas, x_offset + 33, y_offset + 19, "level pit");

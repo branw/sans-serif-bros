@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "game.h"
 #include "util.h"
+#include "log.h"
 
 #define MONEY 0xa3
 #define PIPE 0xa6
@@ -23,10 +24,10 @@ bool game_parse_and_validate_field(char *field_str, uint32_t *field) {
             continue;
         } else {
             if (row >= ROWS) {
-                fprintf(stderr, "Bad level: too many rows\n");
+                LOG_ERROR("Bad level: too many rows");
                 return false;
             } else if (column >= COLUMNS) {
-                fprintf(stderr, "Bad level: too many columns in row %d\n", row);
+                LOG_ERROR("Bad level: too many columns in row %d", row);
                 return false;
             }
 
