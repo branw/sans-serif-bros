@@ -36,13 +36,13 @@ target_link_options(test-ssb PRIVATE -fsanitize=address,undefined)
 target_link_libraries(test-ssb PRIVATE unofficial::sqlite3::sqlite3)
 
 # Fuzzer targets
-add_executable(fuzz-ssb src/fuzzers.cpp ${SOURCES})
-target_include_directories(fuzz-ssb PRIVATE src ext/baro)
+add_executable(fuzz-ssb-terminal-parse src/fuzzers/fuzz_terminal_parse.cpp ${SOURCES})
+target_include_directories(fuzz-ssb-terminal-parse PRIVATE src ext/baro)
 
-target_compile_options(fuzz-ssb PRIVATE -g -O1 -fsanitize=fuzzer,address)
-target_link_libraries(fuzz-ssb PRIVATE -fsanitize=fuzzer,address)
+target_compile_options(fuzz-ssb-terminal-parse PRIVATE -g -O0 -fsanitize=fuzzer,address)
+target_link_libraries(fuzz-ssb-terminal-parse PRIVATE -fsanitize=fuzzer,address)
 
-target_link_libraries(fuzz-ssb PRIVATE unofficial::sqlite3::sqlite3)
+target_link_libraries(fuzz-ssb-terminal-parse PRIVATE unofficial::sqlite3::sqlite3)
 
 enable_testing()
 add_test(ssb test-ssb)

@@ -9,6 +9,7 @@ extern "C" {
 
 #define SSB_MIN(A, B) ((A) > (B) ? (B) : (A))
 #define SSB_MAX(A, B) ((A) < (B) ? (B) : (A))
+#define SSB_CLAMP(X, LOWER, UPPER) SSB_MAX(SSB_MIN((X), (UPPER)), (LOWER))
 
 unsigned long utf8_decode(char **s);
 

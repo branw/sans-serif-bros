@@ -25,29 +25,40 @@ void terminal_destroy(struct terminal *terminal) {
 // Parse a 16-bit value from the buffer. This obviously requires at least
 // 2 bytes, but may require up to 4 as 0xFF/IAC must be escaped.
 static bool parse_escaped_u16(char **buf, size_t *len, uint16_t *out) {
-    if (**buf == '\xff') {
+    if (*len < 2) {
+        return false;
+    }
+
+    char *working_buf = *buf;
+    size_t working_len = *len;
+
+    if (working_buf[0] == '\xff') {
         // 0xFF only makes sense when it's doubled/escaped
-        if (*len < 2 || (*buf)[1] != '\xff') {
+        if (working_len < 3 || working_buf[1] != '\xff') {
             return false;
         }
-        *buf += 1;
-        *len -= 1;
+        working_buf += 1;
+        working_len -= 1;
     }
 
-    uint16_t result = (uint8_t)**buf << 8;
+    uint16_t result = (uint8_t)(working_buf[0]) << 8;
+    working_buf += 1;
+    working_len -= 1;
 
-    if ((*buf)[1] == '\xff') {
-        if (*len < 3 || (*buf)[2] != '\xff') {
+    if (working_buf[0] == '\xff') {
+        if (working_len < 2 || working_buf[1] != '\xff') {
             return false;
         }
-        *buf += 1;
-        *len -= 1;
+        working_buf += 1;
+        working_len -= 1;
     }
-    result |= (uint8_t)((*buf)[1]);
 
-    *buf += 2;
-    *len -= 2;
+    result |= (uint8_t)(working_buf[0]);
+    working_buf += 1;
+    working_len -= 1;
 
+    *buf = working_buf;
+    *len = working_len;
     *out = result;
     return true;
 }
@@ -118,12 +129,12 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
             terminal->will_naws = ((*buf)[1] == *WILL);
         }
 
-        printf("Received Telnet negotiation: %s <%d>\n",
+        printf("Received Telnet negotiation: %s <%u>\n",
                (*buf)[1] == *WILL ? "WILL" :
                (*buf)[1] == *WONT ? "WONT" :
                (*buf)[1] == *DO ? "DO" :
                (*buf)[1] == *DONT ? "DONT" : "???",
-               (*buf)[2]);
+               (uint8_t)((*buf)[2]));
 
         *buf += 3;
         *len -= 3;
@@ -140,16 +151,23 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
             *len -= 3;
 
             uint16_t cols = 0, rows = 0;
-            if (!parse_escaped_u16(buf, len, &cols) || !parse_escaped_u16(buf, len, &rows) ||
-                    ((*buf)[0] != *IAC && (*buf)[1] != *SE)) {
+            if (!parse_escaped_u16(buf, len, &cols) ||
+                    !parse_escaped_u16(buf, len, &rows) ||
+                    (*len >= 2 && (*buf)[0] != *IAC && (*buf)[1] != *SE)) {
                 *buf = original_buf;
                 *len = original_len;
                 return false;
             }
 
             printf("Received NAWS: %d cols, %d rows\n", cols, rows);
+            uint16_t clamped_cols = SSB_CLAMP(cols, COLUMNS, 200);
+            uint16_t clamped_rows = SSB_CLAMP(rows, ROWS, 200);
+            if (clamped_cols != cols || clamped_rows != rows) {
+                fprintf(stderr, "Clamping NAWS resolution (%d cols, %d rows) to %d cols, %d rows",
+                        cols, rows, clamped_cols, clamped_rows);
+            }
 
-            canvas_resize(terminal->canvas, SSB_MAX(cols, 80), SSB_MAX(rows, 25));
+            canvas_resize(terminal->canvas, clamped_cols, clamped_rows);
 
             return true;
         }
