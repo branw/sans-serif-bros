@@ -1,6 +1,10 @@
 #ifndef SSB_TERMINAL_H
 #define SSB_TERMINAL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -40,7 +44,7 @@ struct keyboard_input {
     uint8_t right : 1;
 
     uint8_t insert : 1;
-    uint8_t delete : 1;
+    uint8_t del : 1;
     uint8_t home : 1;
     uint8_t page_up : 1;
     uint8_t page_down : 1;
@@ -141,5 +145,9 @@ void terminal_read_menu_input(struct session *sess, struct menu_input *input);
 
 bool terminal_dimensions(struct session *sess, unsigned *w, unsigned *h);
 */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_TERMINAL_H

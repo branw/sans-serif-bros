@@ -1,6 +1,10 @@
 #ifndef SSB_SERVER_H
 #define SSB_SERVER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "session.h"
 
 struct server {
@@ -19,5 +23,9 @@ bool server_update(struct server *server);
 void server_disconnect_session(struct server *server, struct session *session);
 
 bool server_next_session(struct server *server, struct session **session);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_SERVER_H

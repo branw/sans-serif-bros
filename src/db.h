@@ -1,6 +1,10 @@
 #ifndef SSB_DB_H
 #define SSB_DB_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,5 +58,9 @@ bool db_get_level_bounds(struct db *db, uint32_t *min_level, uint32_t *max_level
 bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field);
 
 bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadata *metadata);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_DB_H

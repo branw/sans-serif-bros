@@ -1,6 +1,10 @@
 #ifndef SSB_SESSION_H
 #define SSB_SESSION_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "state.h"
 
 struct session {
@@ -19,5 +23,9 @@ void session_destroy(struct session *session);
 bool session_receive(struct session *session, char *buf, size_t len, size_t *len_written);
 
 void session_send(struct session *session, char *buf, size_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_SESSION_H

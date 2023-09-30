@@ -1,6 +1,10 @@
 #ifndef SSB_CANVAS_H
 #define SSB_CANVAS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -104,5 +108,8 @@ void canvas_background(struct canvas *canvas, enum color color);
         canvas_italic(CANVAS, true); do { x } while (0); canvas_italic(CANVAS, false); \
     } while(0)
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_CANVAS_H

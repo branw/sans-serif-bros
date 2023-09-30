@@ -1,6 +1,10 @@
 #ifndef SSB_CONFIG_H
 #define SSB_CONFIG_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Number of columns in the game field
 #define COLUMNS 80
 // Number of rows in the game field
@@ -21,5 +25,9 @@
 #define WELCOME_MESSAGE \
     "Super Serif Bros. Telnet Edition\n\r" \
     "(commit " GIT_COMMIT_HASH " from " GIT_COMMIT_TIMESTAMP ")\n\r"
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_CONFIG_H

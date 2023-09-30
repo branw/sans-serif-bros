@@ -1,6 +1,10 @@
 #ifndef SSB_STATE_H
 #define SSB_STATE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <time.h>
 #include <stdbool.h>
 #include "canvas.h"
@@ -41,5 +45,9 @@ struct screen *state_peek_screen(struct state *state);
 struct screen *state_pop_screen(struct state *state);
 
 bool state_update(struct state *state, struct env *env);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_STATE_H

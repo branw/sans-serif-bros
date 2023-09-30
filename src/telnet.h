@@ -1,6 +1,10 @@
 #ifndef SSB_TELNET_H
 #define SSB_TELNET_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ESC "\x1b" // 13
 
 #define ECHO "\x01" // 1
@@ -27,5 +31,9 @@
 #define NOP  "\xf1"
 #define SE   "\xf0"
 #define EOR  "\xef"
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SSB_TELNET_H
