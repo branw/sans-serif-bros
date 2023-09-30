@@ -84,7 +84,10 @@ int run_standalone(struct db *db) {
         // Flush and send output data
         size_t write_len;
         while (terminal_flush(&state.terminal, buf, 512, &write_len)) {
-            write(STDOUT_FILENO, buf, write_len);
+            size_t const written_len = write(STDOUT_FILENO, buf, write_len);
+            if (written_len != write_len) {
+                LOG_ERROR("Tried writing %d, but only wrote %d", write_len, written_len);
+            }
         }
     }
 
