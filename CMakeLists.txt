@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.9)
+
+# Use submodule vcpkg if no other path is provided
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "Vcpkg toolchain file")
+
 project(ssb C)
 
 set(CMAKE_C_STANDARD 11)

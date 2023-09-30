@@ -1,3 +1,6 @@
 [submodule "ext/baro"]
 	path = ext/baro
 	url = git@github.com:branw/baro.git
+[submodule "ext/vcpkg"]
+	path = ext/vcpkg
+	url = https://github.com/microsoft/vcpkg
