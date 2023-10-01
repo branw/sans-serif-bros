@@ -45,6 +45,9 @@ struct screen *game_screen_create(struct env *env, uint32_t level_id) {
 bool game_screen_update(void *data, struct state *state, struct env *env) {
     struct game_screen_state *screen = data;
 
+    canvas_reset(&state->canvas);
+    canvas_erase(&state->canvas);
+
     // Allow flashes of color during transitions
     bool color = true;
 

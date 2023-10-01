@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <assert.h>
 #include "../util.h"
 #include "../db.h"
 #include "../state.h"
@@ -26,10 +27,34 @@ struct screen *level_pit_screen_create(struct env *env) {
     return screen;
 }
 
+static void draw_scrollbar(struct canvas *canvas, int x, int y, int w, int h, uint32_t first_id, uint32_t last_id, uint32_t max_id) {
+    assert(w >= 3);
+    assert(h >= 4);
+
+    canvas_rect(canvas, x, y, w, h, '|');
+    canvas_put(canvas, x + 1, y, '^');
+    canvas_put(canvas, x + 1, y + 1, '=');
+    canvas_put(canvas, x + 1, y + h - 2, '=');
+    canvas_put(canvas, x + 1, y + h - 1, 'v');
+
+    double const scrollbar_percentage_top = (double) first_id / max_id;
+    double const scrollbar_percentage_bottom = (double) last_id / max_id;
+    int const scrollbar_dragger_space = h - 4;
+    int const scrollbar_dragger_y = (int)(scrollbar_percentage_top * scrollbar_dragger_space);
+    int const scrollbar_dragger_height = SSB_CLAMP(
+            (int)(scrollbar_percentage_bottom * scrollbar_dragger_space) - scrollbar_dragger_y,
+            1,
+            scrollbar_dragger_space - scrollbar_dragger_y);
+
+    canvas_rect(canvas, x + 1, y + 2 + scrollbar_dragger_y, w - 2, scrollbar_dragger_height, '#');
+
+}
+
 bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     struct level_pit_screen_state *screen = data;
 
-    //TODO no need to update this every tick
+    canvas_foreground(&state->canvas, white);
+    canvas_background(&state->canvas, black);
     canvas_erase(&state->canvas);
 
     char *logo =
@@ -57,14 +82,18 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
         return false;
     }
 
+    // Draw level list
     uint32_t selected_id = 0;
-    uint32_t const last_id = metadata[num_levels - 1].id;
     for (int i = 0; i < num_levels; i++) {
+        time_t const creation_timestamp = (time_t) metadata[i].creation_time;
+        char creation_time_buf[32];
+        strftime(creation_time_buf, sizeof(creation_time_buf), "%Y-%m-%d", gmtime(&creation_timestamp));
+
         char buf[80];
         snprintf(buf, 80, "%5d %-12s %10s %7d   %3.1u%% %9s",
                 metadata[i].id,
                 (char *) metadata[i].name,
-                "2020-05-12",
+                creation_time_buf,
                 metadata[i].num_plays,
                 metadata[i].num_plays == 0 ? 0 : metadata[i].num_wins / metadata[i].num_plays,
                 "0:34.2");
@@ -86,6 +115,12 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     canvas_foreground(&state->canvas, white);
     canvas_background(&state->canvas, black);
 
+    // Draw scrollbar
+    draw_scrollbar(&state->canvas, 72, 8, 3, 16,
+                   (num_levels > 0 ? metadata[0].id : 0),
+                   (num_levels > 0 ? metadata[num_levels-1].id : 0),
+                   max_id);
+
     // Handle input
     if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
         state_push_screen(state, game_screen_create(env, selected_id));
@@ -98,9 +133,9 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
         }
     }
     else if (state->terminal.keyboard.down) {
-        if (screen->selected_index < 15) {
+        if (screen->selected_index < num_levels - 1) {
             screen->selected_index++;
-        } else if (num_levels == 16) {
+        } else if (num_levels == 16 && metadata[num_levels - 1].id < max_id) {
             screen->top_id = metadata[1].id;
         }
     } else if (state->terminal.keyboard.esc) {

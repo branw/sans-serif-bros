@@ -281,7 +281,7 @@ void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
     new_cell.code_point = symbol;
 
     for (unsigned row = y; row < y + h; row++) {
-        unsigned step = (row == y || row == y + h - 1) ? 1 : w - 1;
+        unsigned const step = (row == y || row == y + h - 1 || w == 1) ? 1 : w - 1;
         for (unsigned col = x; col < x + w; col += step) {
             canvas->buf[1][col + row * canvas->w] = new_cell;
         }
