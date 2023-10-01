@@ -122,9 +122,10 @@ int run_server(struct db *db, char *service) {
 
             // Try to update the state
             bool const keep_alive = state_update(session->state, &env);
+
             if (alive) {
-                // Flush and send output data, even when we're about to close
-                // the connection
+                // Flush and send output data if we're alive, even when we're
+                // about to close the connection
                 while (terminal_flush(&session->state->terminal, buf, 512, &len)) {
                     session_send(session, buf, len);
                 }

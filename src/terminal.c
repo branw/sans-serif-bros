@@ -187,11 +187,12 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
             LOG_DEBUG("Received NAWS: %d cols, %d rows", cols, rows);
 
             // The canvas must be at least 80x25 to render the game, so we
-            // blissfully ignore any smaller windows
+            // blissfully ignore any smaller windows. We need an upperbound
+            // as well to prevent DoSing
             uint16_t clamped_cols = SSB_CLAMP(cols, COLUMNS, 200);
             uint16_t clamped_rows = SSB_CLAMP(rows, ROWS, 200);
             if (clamped_cols != cols || clamped_rows != rows) {
-                LOG_WARN("Clamping NAWS resolution (%d cols, %d rows) to %d cols, %d rows",
+                LOG_INFO("Clamping NAWS resolution (%d cols, %d rows) to %d cols, %d rows",
                         cols, rows, clamped_cols, clamped_rows);
             }
 

@@ -1,6 +1,6 @@
 #include "state.h"
 
-extern "C" int LLVMFuzzerTestOneInput(uint8_t const *buf, size_t len) {
+extern "C" [[maybe_unused]] int LLVMFuzzerTestOneInput(uint8_t const *buf, size_t len) {
     state state = {};
     state_create(&state);
 
