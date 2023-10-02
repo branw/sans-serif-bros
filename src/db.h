@@ -15,21 +15,23 @@ struct metadata {
     // Number of the level, starting at 1 and not necessarily continuous,
     // considering the inclusion of recovered levels
     uint32_t id;
-    // 12 Unicode character name of the level
-    uint32_t name[13];
+    // 12 UTF-8 character name of the level (worst case: 12 * 4 + 1)
+    uint8_t name[49];
 
     // GMT Unix timestamp of the level creation time
     uint64_t creation_time;
 
     // Number of times the level has been started
-    uint32_t num_plays;
+    uint32_t num_attempts;
     // Number of winning plays
     uint32_t num_wins;
-    // Number of losing plays
-    uint32_t num_losses;
+    // Number of deaths
+    uint32_t num_deaths;
 
-    // Lowest number of game ticks taken to complete a level
-    uint32_t best_time;
+    // Lowest number of game ticks taken to win the level
+    uint32_t min_ticks;
+    // Average number of game ticks to win the level
+    uint32_t average_ticks;
 };
 
 struct level {
@@ -58,6 +60,10 @@ bool db_get_level_bounds(struct db *db, uint32_t *min_level, uint32_t *max_level
 bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field);
 
 bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadata *metadata);
+
+enum game_state;
+
+bool db_insert_attempt(struct db *db, uint32_t level_id, uint32_t ticks, enum game_state game_state, char *input_log);
 
 #ifdef __cplusplus
 }

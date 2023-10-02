@@ -10,6 +10,9 @@ extern "C" {
 // Number of rows in the game field
 #define ROWS 25
 
+// Maximum length of the input log recorded for a level playthrough
+#define INPUT_LOG_LEN 65536
+
 // Show incoming messages
 #define DEBUG_INCOMING 1
 // Show outgoing messages

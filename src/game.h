@@ -19,14 +19,27 @@ struct game {
     uint32_t field[ROWS][COLUMNS];
     uint32_t next_field[ROWS][COLUMNS];
 
+    char input_log[INPUT_LOG_LEN];
+    size_t input_log_len;
+    uint32_t ticks_without_input;
+
     struct directional_input input;
+};
+
+enum game_state {
+    GAME_STATE_IN_PROGRESS = 0,
+    GAME_STATE_WON = 1,
+    GAME_STATE_DIED,
+    GAME_STATE_QUIT,
 };
 
 bool game_parse_and_validate_field(char *field_str, uint32_t *field);
 
 bool game_create_from_utf8(struct game *game, char *stage);
 
-void game_update(struct game *game, struct directional_input *input);
+enum game_state game_update(struct game *game, struct directional_input *input);
+
+char const *game_state_to_str(enum game_state game_state);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,6 @@
 #include <memory.h>
 #include <stdio.h>
+#include <assert.h>
 #include "game.h"
 #include "util.h"
 #include "log.h"
@@ -44,6 +45,10 @@ bool game_create_from_utf8(struct game *game, char *field_str) {
     game->win = game->die = game->no_money_left = false;
     game->tired = 0;
 
+    memset(game->input_log, 0, sizeof(game->input_log));
+    game->input_log_len = 0;
+    game->ticks_without_input = 0;
+
     return game_parse_and_validate_field(field_str, (uint32_t *) game->field);
 }
 
@@ -76,7 +81,7 @@ static bool probe(struct game *state, unsigned x, unsigned y, unsigned long ch) 
         return true;
     }
 
-    unsigned long ob = state->field[y][x], next_ob = state->next_field[y][x];
+    unsigned long const ob = state->field[y][x], next_ob = state->next_field[y][x];
 
     switch (ch) {
     case 'I': {
@@ -105,7 +110,7 @@ static bool probe(struct game *state, unsigned x, unsigned y, unsigned long ch) 
         }
 
         case 'O': {
-            int d = state->input.left ? -1 : (state->input.right ? 1 : 0);
+            int const d = LEFT ? -1 : (RIGHT ? 1 : 0);
             if (d != 0 && probe(state, x, y + 1, ob) && !probe(state, x + d, y, ob) &&
                 state->field[y][x - d] == 'I') {
                 state->next_field[y][x + d] = ob;
@@ -498,11 +503,35 @@ static void process_frame_8(struct game *state) {
     }
 }
 
-void game_update(struct game *game, struct directional_input *input) {
+enum game_state game_update(struct game *game, struct directional_input *input) {
     game->input = *input;
 
-    if (game->win || game->die) {
-        return;
+    if (input->left || input->right || input->up || input->down) {
+        if (game->ticks_without_input > 0) {
+            game->input_log_len += snprintf(
+                    game->input_log + game->input_log_len,INPUT_LOG_LEN - game->input_log_len,
+                    "%d", game->ticks_without_input);
+
+            game->ticks_without_input = 0;
+        }
+
+        if (game->input_log_len >= INPUT_LOG_LEN) {
+            LOG_ERROR("Outgrew input log (%d bytes)!", game->input_log_len);
+        } else {
+            // Order matters: the game logic consistently prefers L > R > U > D
+            game->input_log[game->input_log_len++] =
+                    input->left ? 'L' :
+                    input->right ? 'R' :
+                    input->up ? 'U' :'D';
+        }
+    } else {
+        game->ticks_without_input++;
+    }
+
+    if (game->win) {
+        return GAME_STATE_WON;
+    } else if (game->die) {
+        return GAME_STATE_DIED;
     }
 
     memcpy(game->next_field, game->field, ROWS * COLUMNS * sizeof(uint32_t));
@@ -520,6 +549,10 @@ void game_update(struct game *game, struct directional_input *input) {
         process_frame_8(game);
     }
 
+    if (game->win || game->die) {
+        LOG_DEBUG("Input log (%d ticks, %d bytes): %s", game->tick, game->input_log_len, game->input_log);
+    }
+
     memcpy(game->field, game->next_field, ROWS * COLUMNS * sizeof(uint32_t));
 
     if (game->tired) {
@@ -527,5 +560,17 @@ void game_update(struct game *game, struct directional_input *input) {
         if (game->tired > 2) {
             game->tired = 0;
         }
+    }
+
+    return GAME_STATE_IN_PROGRESS;
+}
+
+char const *game_state_to_str(enum game_state game_state) {
+    switch (game_state) {
+        case GAME_STATE_IN_PROGRESS: return "in_progress";
+        case GAME_STATE_WON: return "won";
+        case GAME_STATE_DIED: return "died";
+        case GAME_STATE_QUIT: return "quit";
+        default: assert(false);
     }
 }

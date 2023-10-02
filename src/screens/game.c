@@ -13,6 +13,8 @@ struct game_screen_state {
     uint32_t level_id;
     struct game game;
 
+    enum game_state last_game_state;
+
     int transition_ticks;
 };
 
@@ -21,6 +23,7 @@ struct screen *game_screen_create(struct env *env, uint32_t level_id) {
     *(struct game_screen_state *)(screen->data) = (struct game_screen_state){
             .level_id = level_id,
             .game = {0},
+            .last_game_state = GAME_STATE_IN_PROGRESS,
             .transition_ticks = -1,
     };
     screen->impl = &game_screen_impl;
@@ -70,6 +73,12 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_foreground(&state->canvas, blue);
         canvas_background(&state->canvas, blue);
     } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'Q')) {
+        // Log quit games as failed attempts, but only if the player has
+        // actually made any inputs
+        bool const has_played_level = screen->game.input_log_len > 5;
+        if (has_played_level && !db_insert_attempt(env->db, screen->level_id, screen->game.tick, GAME_STATE_QUIT, screen->game.input_log)) {
+            LOG_ERROR("Failed to record quit attempt");
+        }
         return false;
     } else if (state->terminal.keyboard.space && screen->game.win) {
         char *field = NULL;
@@ -93,16 +102,25 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     struct directional_input input;
     terminal_get_directional_input(&state->terminal, &input, false);
 
-    game_update(&screen->game, &input);
+    enum game_state game_state = game_update(&screen->game, &input);
+    if (game_state != screen->last_game_state) {
+        if (game_state != GAME_STATE_IN_PROGRESS) {
+            if (!db_insert_attempt(env->db, screen->level_id, screen->game.tick, game_state, screen->game.input_log)) {
+                LOG_ERROR("Failed to record attempt");
+            }
+        }
+
+        screen->last_game_state = game_state;
+    }
 
     KEYBOARD_CLEAR(state->terminal.keyboard);
 
     // Color based on the current state
-    if (color && screen->game.win) {
+    if (color && game_state == GAME_STATE_WON) {
         canvas_foreground(&state->canvas, black);
         canvas_background(&state->canvas, green);
     }
-    else if (color && screen->game.die) {
+    else if (color && game_state == GAME_STATE_DIED) {
         canvas_foreground(&state->canvas, black);
         canvas_background(&state->canvas, red);
     }
@@ -118,7 +136,7 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
                              (uint32_t *) screen->game.field, ROWS * COLUMNS);
 
     // Color individual cells
-    if (color && !screen->game.win && !screen->game.die) {
+    if (color && game_state == GAME_STATE_IN_PROGRESS) {
         for (unsigned y = 0; y < 25; y++) {
             for (unsigned x = 0; x < 80; x++) {
                 unsigned long ch = screen->game.field[y][x];

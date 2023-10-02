@@ -44,8 +44,6 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
 
     // Handle input
     if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
-        LOG_DEBUG("Changing: %d %d", state->terminal.keyboard.space, state->terminal.keyboard.enter);
-
         switch (screen->selection) {
             // classic mode
             case 0:
@@ -59,7 +57,7 @@ bool title_screen_update(void *data, struct state *state, struct env *env) {
 
             // instructions
             case 2:
-
+                //TODO
                 break;
 
             // quit game

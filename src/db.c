@@ -8,6 +8,8 @@
 #include "game.h"
 #include "log.h"
 
+#define CURRENT_VERSION 2
+
 static int get_user_version(sqlite3 *db) {
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt, 0);
@@ -54,8 +56,6 @@ static bool execute_many_statements(sqlite3 *db, char const *sql) {
 
     return true;
 }
-
-#define CURRENT_VERSION 1
 
 static bool read_and_validate_level(char *path, char **field_str) {
     FILE *f = fopen(path, "r");
@@ -223,6 +223,22 @@ static bool migrate(sqlite3 *db, char *levels_path) {
                                     "COMMIT;");
             // fallthrough
 
+        // Track level attempts
+        case 1:
+            LOG_DEBUG("Migrating DB from version 1 to 2");
+            execute_many_statements(db,
+                                    "BEGIN;"
+                                    "CREATE TABLE attempt ("
+                                    "    id INTEGER NOT NULL PRIMARY KEY,"
+                                    "    level_id INTEGER NOT NULL,"
+                                    "    ticks INTEGER NOT NULL,"
+                                    "    end_state TEXT NOT NULL,"
+                                    "    input_log TEXT NOT NULL,"
+                                    "    timestamp INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+                                    "PRAGMA user_version = 2;"
+                                    "COMMIT;");
+            // fallthrough
+
         case CURRENT_VERSION:
             if (should_load_levels) {
                 return load_levels(db, levels_path);
@@ -259,21 +275,36 @@ void db_destroy(struct db *db) {
 // Get metadata for up to `count` levels, starting after `id`
 int db_get_metadata(struct db *db, uint32_t after_id, struct metadata *metadata, int count) {
     sqlite3_stmt *stmt = NULL;
-    int rc = sqlite3_prepare_v2(db->db, "SELECT id, name, creation_timestamp FROM level WHERE id > ? LIMIT ?;", -1, &stmt, NULL);
+    int rc = sqlite3_prepare_v2(db->db,
+                                "SELECT\n"
+                                "    level.id,\n"
+                                "    level.name,\n"
+                                "    strftime('%s', level.creation_timestamp) as creation_timestamp,\n"
+                                "    count(attempt.id) as plays,\n"
+                                "    sum(case when attempt.end_state = \"won\" then 1 else 0 end) as wins,\n"
+                                "    sum(case when attempt.end_state = \"died\" then 1 else 0 end) as deaths,\n"
+                                "    min(case when attempt.end_state = \"won\" then attempt.ticks end) as min_ticks,\n"
+                                "    avg(case when attempt.end_state = \"won\" then attempt.ticks end) as avg_ticks\n"
+                                "FROM level\n"
+                                "LEFT JOIN attempt on attempt.level_id = level.id\n"
+                                "WHERE level.id > ?\n"
+                                "GROUP BY level.id\n"
+                                "ORDER BY level.id\n"
+                                "LIMIT ?;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_metadata prepare failed: %d", rc);
+        LOG_ERROR("prepare failed: %d", rc);
         return 0;
     }
 
     rc = sqlite3_bind_int(stmt, 1, (int) after_id);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_metadata bind 1 failed: %d", rc);
+        LOG_ERROR("bind 1 failed: %d", rc);
         return 0;
     }
 
     rc = sqlite3_bind_int(stmt, 2, count);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_metadata bind 2 failed: %d", rc);
+        LOG_ERROR("bind 2 failed: %d", rc);
         return 0;
     }
 
@@ -281,25 +312,30 @@ int db_get_metadata(struct db *db, uint32_t after_id, struct metadata *metadata,
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         int id = sqlite3_column_int(stmt, 0);
         uint8_t const *name = sqlite3_column_text(stmt, 1);
-        size_t name_len = sqlite3_column_bytes(stmt, 1);
         int creation_timestamp = sqlite3_column_int(stmt, 2);
+        int num_attempts = sqlite3_column_int(stmt, 3);
+        int num_wins = sqlite3_column_int(stmt, 4);
+        int num_deaths = sqlite3_column_int(stmt, 5);
+        int min_ticks = sqlite3_column_int(stmt, 6);
+        int avg_ticks = sqlite3_column_int(stmt, 7);
 
         struct metadata m = {
                 .id = id,
                 .creation_time = creation_timestamp,
+                .num_attempts = num_attempts,
+                .num_wins = num_wins,
+                .num_deaths = num_deaths,
+                .min_ticks = min_ticks,
+                .average_ticks = avg_ticks,
         };
-
-        uint32_t *m_name = m.name;
-        while (name_len-- && m_name++) {
-            *m_name = utf8_decode((char **)&name);
-        }
+        strncpy((char *) m.name, (char *) name, 49);
 
         metadata[num_levels] = m;
 
         num_levels++;
     }
     if (rc != SQLITE_DONE) {
-        LOG_ERROR("db_get_metadata not done: %d", rc);
+        LOG_ERROR("not done: %d", rc);
         return 0;
     }
 
@@ -452,4 +488,59 @@ bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadat
 
 
     return true;
+}
+
+//                                     "    id INTEGER NOT NULL PRIMARY KEY,"
+//                                    "    level_id INTEGER NOT NULL,"
+//                                    "    ticks INTEGER NOT NULL,"
+//                                    "    end_state TEXT NOT NULL,"
+//                                    "    input_log TEXT NOT NULL,"
+//                                    "    timestamp INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+
+bool db_insert_attempt(struct db *db, uint32_t level_id, uint32_t ticks, enum game_state game_state, char *input_log) {
+    LOG_DEBUG("Logging attempt of %d: %d ticks, %s", level_id, ticks, game_state_to_str(game_state));
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db->db, "INSERT INTO attempt (level_id, ticks, end_state, input_log) VALUES (?, ?, ?, ?);", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("prepare failed: %d", rc);
+        return false;
+    }
+
+    rc = sqlite3_bind_int(stmt, 1, (int) level_id);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("bind level_id failed: %d", rc);
+        goto fail;
+    }
+
+    rc = sqlite3_bind_int(stmt, 2, (int) ticks);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("bind ticks failed: %d", rc);
+        goto fail;
+    }
+
+    rc = sqlite3_bind_text(stmt, 3, game_state_to_str(game_state), -1, SQLITE_STATIC);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("bind game_state failed: %d", rc);
+        goto fail;
+    }
+
+    rc = sqlite3_bind_text(stmt, 4, input_log, -1, SQLITE_STATIC);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("bind input_log failed: %d", rc);
+        goto fail;
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        LOG_ERROR("step failed: %d", rc);
+        goto fail;
+    }
+
+    sqlite3_finalize(stmt);
+    return true;
+
+    fail:
+    sqlite3_finalize(stmt);
+    return false;
 }

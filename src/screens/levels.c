@@ -50,6 +50,15 @@ static void draw_scrollbar(struct canvas *canvas, int x, int y, int w, int h, ui
 
 }
 
+size_t snprintf_time_in_ticks(char *buf, size_t len, uint32_t num_ticks) {
+    uint32_t milliseconds = num_ticks * 100;
+    uint32_t seconds = milliseconds / 1000;
+    milliseconds %= 1000;
+    uint32_t minutes = seconds / 60;
+    seconds %= 60;
+    return snprintf(buf, len, "%u:%02u.%01u", minutes, seconds, milliseconds / 100);
+}
+
 bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     struct level_pit_screen_state *screen = data;
 
@@ -67,8 +76,8 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     canvas_write_block(&state->canvas, 8, 0, 64, 5, logo);
 
     char *header =
-            "    # NAME         CREATED    PLAYS   WINRATE BEST TIME"
-            "===== ============ ========== ======= ======= =========";
+            "    # NAME         CREATED    PLAYS   WINRATE BEST TIME"// AVG TIME "
+            "===== ============ ========== ======= ======= =========";// =========";
 
     canvas_write_block(&state->canvas, 12, 6, 55, 2, header);
 
@@ -85,18 +94,26 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     // Draw level list
     uint32_t selected_id = 0;
     for (int i = 0; i < num_levels; i++) {
+        // Format the timestamps
         time_t const creation_timestamp = (time_t) metadata[i].creation_time;
         char creation_time_buf[32];
         strftime(creation_time_buf, sizeof(creation_time_buf), "%Y-%m-%d", gmtime(&creation_timestamp));
 
+        char best_time_buf[32];
+        if (metadata[i].num_wins == 0) {
+            memcpy(best_time_buf, "-", 2);
+        } else {
+            snprintf_time_in_ticks(best_time_buf, sizeof(best_time_buf), metadata[i].min_ticks);
+        }
+
         char buf[80];
-        snprintf(buf, 80, "%5d %-12s %10s %7d   %3.1u%% %9s",
+        snprintf(buf, 80, "%5d %-12s %10s %7d  %5.01f%% %9s",
                 metadata[i].id,
-                (char *) metadata[i].name,
+                metadata[i].name,
                 creation_time_buf,
-                metadata[i].num_plays,
-                metadata[i].num_plays == 0 ? 0 : metadata[i].num_wins / metadata[i].num_plays,
-                "0:34.2");
+                metadata[i].num_attempts,
+                metadata[i].num_attempts == 0 ? 0 : ((double)metadata[i].num_wins / metadata[i].num_attempts) * 100,
+                best_time_buf);
 
         if (i == screen->selected_index) {
             selected_id = metadata[i].id;
