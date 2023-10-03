@@ -4,9 +4,36 @@ A classic ASCII platformer revived with a Telnet interface
 
 ![Screenshot](https://user-images.githubusercontent.com/2104778/84941147-f33ed200-b0ae-11ea-9bb1-4fc491022c53.png)
 
+## Progress
+
+- Game
+  - [x] Implement original game logic
+  - [x] Recover and import original default levels
+  - [ ] Add interface for exploring the default levels
+  - [ ] Add additional info to game HUD
+- Telnet
+  - [x] Implement basic spec
+  - [x] Create framework for terminal input processing and output rendering
+  - [x] Support Telnet window size options (RFC 1073)
+  - [ ] Support user persistence (e.g. keeping statistics between sessions)
+- Level Pit
+  - [x] Recover and import original user-submitted levels
+  - [x] Track level attempt statistics
+  - [ ] Add level attempt playback
+  - [ ] Add level creator
+- Internals
+  - [x] Support single-player and multi-player configurations
+  - [x] Support Linux builds
+  - [x] Support macOS builds
+  - [ ] Support Windows builds
+  - [x] Use SQLite as a data store
+
 ## Building
 
-`ssb` requires `gcc`, `cmake`, and Linux headers. To build and run unit tests:
+`ssb` requires CMake, a C11 compiler, *nix headers, and SQLite (optionally
+installed with the included vcpkg manifest).
+
+To build and run unit tests:
 
 ```shell script
 cmake .;
@@ -16,12 +43,16 @@ ctest --verbose;
 
 ## Playing
 
-`ssb` requires a directory for storing the level database. Although write-access
-is not required, it does allow for levels and metadata to be saved. This
-directory defaults to `./levels`, but can be specified by the
-`-d path/to/levels` option.
+`ssb` can ran as either a multi-player Telnet server, or as a single-player
+terminal game.
 
-### As a Server
+Both modes require a database and optionally, a folder of existing levels to
+import. The path to the database file can be specified using
+`-d path/to/db.sqlite` (defaulting to `./ssb.sqlite` otherwise), and the path
+to the levels folder can be specified using `-l path/to/levels/` (defaulting
+to `./levels/`).
+
+### As a Telnet Server (Multi-Player)
 
 `ssb` is designed to run as a Telnet server, allowing multiple simultaneous
 players and player-submitted level designs.
@@ -56,7 +87,7 @@ non-superuser access to privileged ports, i.e. ports below 1024. You can either:
   ./ssb -p 8080
   ```
 
-### Without a Server
+### As a Terminal Game (Single-Player)
 
 `ssb` can also be ran serverless via standalone mode:
 
@@ -66,12 +97,17 @@ non-superuser access to privileged ports, i.e. ports below 1024. You can either:
 
 ## History
 
-"Super Serif Brothers" was released by Robin Allen in the early days of
-web-based games.
+"[Super Serif Brothers](https://foon.uk/farcade/ssb/)" was a web platformer
+created by [Robin Allen](https://foon.uk/) in the early days of the internet.
+This is a faithful recreation that takes the ASCII game one step further and
+brings it into the terminal.
 
-The original game also featured a "level pit" in which players could design and
-upload their own levels. Unfortunately, a good chunk of these designs were lost
-and only a small number could be recovered from archive.org records.
+The original game included fourteen 80x25 character levels, plus a "level pit"
+where netizens could share their own level designs -- some wonderful works of
+art that pushed the format to its limits, among other levels that serve as more
+of "digital graffiti." Unfortunately a good chunk of these player-submitted
+levels have been lost to time. Those that could be recovered are included,
+along with the original fourteen levels, in the `levels` directory.
 
 ## License
 
