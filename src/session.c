@@ -5,10 +5,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
 #include "session.h"
 #include "log.h"
 
+_Atomic uint64_t next_session_id = 1;
+
 bool session_create(struct session *session, int socket) {
+    session->id = next_session_id++;
+
     session->socket = socket;
 
     session->state = malloc(sizeof(struct state));
@@ -17,6 +23,17 @@ bool session_create(struct session *session, int socket) {
     // Enable non-blocking mode
     u_long mode = 1;
     ioctl(session->socket, FIONBIO, &mode);
+
+    struct sockaddr_in addr;
+    socklen_t addr_size = sizeof(struct sockaddr_in);
+    if (getpeername(session->socket, (struct sockaddr *)&addr, &addr_size)) {
+        LOG_ERROR("Failed to getpeername for session #%d: %s", session->id, strerror(errno));
+    } else {
+        char ip[20];
+        strncpy(ip, inet_ntoa(addr.sin_addr), sizeof(ip));
+
+        LOG_INFO("Session #%u created for %s:%d", session->id, ip, addr.sin_port);
+    }
 
     return true;
 }

@@ -8,6 +8,8 @@ extern "C" {
 #include "state.h"
 
 struct session {
+    uint64_t id;
+
     int socket;
 
     struct state *state;

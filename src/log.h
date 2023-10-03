@@ -1,6 +1,8 @@
 #ifndef SSB_LOG_H
 #define SSB_LOG_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,6 +15,9 @@ enum log_level {
     LOG_LEVEL_ERROR,
     LOG_LEVEL_FATAL,
 };
+
+void log_push_context(uint64_t session_id);
+void log_pop_context(void);
 
 void log_printf(enum log_level level, char const *file, int line, char const *func, char const *format, ...);
 

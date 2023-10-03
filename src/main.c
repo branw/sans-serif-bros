@@ -112,6 +112,8 @@ int run_server(struct db *db, char *service) {
         // Update each session
         struct session *session = NULL;
         while (server_next_session(&server, &session)) {
+            log_push_context(session->id);
+
             // Poll the connection for data and parse it
             bool alive;
             char buf[512];
@@ -138,6 +140,8 @@ int run_server(struct db *db, char *service) {
                 server_disconnect_session(&server, session);
                 session = prev;
             }
+
+            log_pop_context();
         }
     }
 

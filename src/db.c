@@ -14,20 +14,20 @@ static int get_user_version(sqlite3 *db) {
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt, 0);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("get_user_version prepare failed: %d", rc);
+        LOG_ERROR("prepare failed: %d", rc);
         return -1;
     }
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_ROW) {
-        LOG_ERROR("get_user_version step failed: %d", rc);
+        LOG_ERROR("step failed: %d", rc);
+        sqlite3_finalize(stmt);
         return -1;
     }
 
     int user_version = sqlite3_column_int(stmt, 0);
 
     sqlite3_finalize(stmt);
-
     return user_version;
 }
 
@@ -41,13 +41,14 @@ static bool execute_many_statements(sqlite3 *db, char const *sql) {
         LOG_DEBUG("Running query \"%.*s\"", (int)(tail - next_sql), next_sql);
         next_sql = tail;
         if (rc != SQLITE_OK) {
-            LOG_ERROR("execute_many_statements prepare failed: %s (%d)", sqlite3_errmsg(db), rc);
+            LOG_ERROR("prepare failed: %s (%d)", sqlite3_errmsg(db), rc);
             return false;
         }
 
         rc = sqlite3_step(stmt);
         if (rc != SQLITE_DONE) {
-            LOG_ERROR("execute_many_statements step failed: %d", rc);
+            LOG_ERROR("step failed: %d", rc);
+            sqlite3_finalize(stmt);
             return false;
         }
 
@@ -60,7 +61,7 @@ static bool execute_many_statements(sqlite3 *db, char const *sql) {
 static bool read_and_validate_level(char *path, char **field_str) {
     FILE *f = fopen(path, "r");
     if (f == NULL) {
-        LOG_ERROR("load_levels fopen \"%s\" failed: %d", path, errno);
+        LOG_ERROR("fopen \"%s\" failed: %d", path, errno);
         return false;
     }
 
@@ -70,7 +71,7 @@ static bool read_and_validate_level(char *path, char **field_str) {
 
     *field_str = malloc(len + 1);
     if (field_str == NULL) {
-        LOG_ERROR("load_levels malloc failed: %d", errno);
+        LOG_ERROR("malloc failed: %d", errno);
         fclose(f);
         return false;
     }
@@ -104,7 +105,7 @@ static bool load_levels(sqlite3 *db, char *levels_path) {
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, "INSERT INTO level (id, name, field) VALUES (?, ?, ?);", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("load_levels prepare failed: %d", rc);
+        LOG_ERROR("prepare failed: %d", rc);
         return false;
     }
 
@@ -145,34 +146,30 @@ static bool load_levels(sqlite3 *db, char *levels_path) {
 
         rc = sqlite3_bind_int(stmt, 1, id);
         if (rc != SQLITE_OK) {
-            LOG_ERROR("load_levels bind id failed: %d", rc);
+            LOG_ERROR("bind id failed: %d", rc);
             free(path);
-            closedir(d);
-            return false;
+            goto fail;
         }
 
         rc = sqlite3_bind_text(stmt, 2, name, -1, SQLITE_TRANSIENT);
         if (rc != SQLITE_OK) {
-            LOG_ERROR("load_levels bind name failed: %d", rc);
+            LOG_ERROR("ind name failed: %d", rc);
             free(path);
-            closedir(d);
-            return false;
+            goto fail;
         }
 
         rc = sqlite3_bind_text(stmt, 3, field_str, -1, SQLITE_TRANSIENT);
         if (rc != SQLITE_OK) {
-            LOG_ERROR("load_levels bind field_str failed: %d", rc);
+            LOG_ERROR("bind field_str failed: %d", rc);
             free(path);
-            closedir(d);
-            return false;
+            goto fail;
         }
 
         rc = sqlite3_step(stmt);
         if (rc != SQLITE_DONE) {
-            LOG_ERROR("load_levels step failed: %d", rc);
+            LOG_ERROR("step failed: %d", rc);
             free(path);
-            closedir(d);
-            return false;
+            goto fail;
         }
 
         sqlite3_reset(stmt);
@@ -180,11 +177,15 @@ static bool load_levels(sqlite3 *db, char *levels_path) {
         free(path);
 
     }
+
     closedir(d);
-
     sqlite3_finalize(stmt);
-
     return true;
+
+    fail:
+    closedir(d);
+    sqlite3_finalize(stmt);
+    return false;
 }
 
 // Safely migrates a DB to the latest version
@@ -299,13 +300,13 @@ int db_get_metadata(struct db *db, uint32_t after_id, struct metadata *metadata,
     rc = sqlite3_bind_int(stmt, 1, (int) after_id);
     if (rc != SQLITE_OK) {
         LOG_ERROR("bind 1 failed: %d", rc);
-        return 0;
+        goto fail;
     }
 
     rc = sqlite3_bind_int(stmt, 2, count);
     if (rc != SQLITE_OK) {
         LOG_ERROR("bind 2 failed: %d", rc);
-        return 0;
+        goto fail;
     }
 
     int num_levels = 0;
@@ -340,37 +341,44 @@ int db_get_metadata(struct db *db, uint32_t after_id, struct metadata *metadata,
     }
 
     sqlite3_finalize(stmt);
-
     return num_levels;
+
+    fail:
+    sqlite3_finalize(stmt);
+    return 0;
 }
 
 int db_get_previous_level(struct db *db, uint32_t before_id) {
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db->db, "SELECT id FROM level WHERE id < ? ORDER BY id DESC LIMIT 1;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_previous_level prepare failed: %d", rc);
+        LOG_ERROR("prepare failed: %d", rc);
         return 0;
     }
 
     rc = sqlite3_bind_int(stmt, 1, (int) before_id);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_previous_level bind failed: %d", rc);
-        return 0;
+        LOG_ERROR("bind failed: %d", rc);
+        goto fail;
     }
 
     rc = sqlite3_step(stmt);
     if (rc == SQLITE_DONE) {
+        sqlite3_finalize(stmt);
         return 0;
     } else if (rc != SQLITE_ROW) {
-        LOG_ERROR("db_get_previous_level step failed: %d", rc);
-        return 0;
+        LOG_ERROR("step failed: %d", rc);
+        goto fail;
     }
 
     int previous_level = sqlite3_column_int(stmt, 0);
 
     sqlite3_finalize(stmt);
-
     return previous_level;
+
+    fail:
+    sqlite3_finalize(stmt);
+    return 0;
 }
 
 int db_num_levels(struct db *db) {
@@ -384,13 +392,13 @@ int db_num_levels(struct db *db) {
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_ROW) {
         LOG_ERROR("db_num_levels step failed: %d", rc);
+        sqlite3_finalize(stmt);
         return 0;
     }
 
     int num_levels = sqlite3_column_int(stmt, 0);
 
     sqlite3_finalize(stmt);
-
     return num_levels;
 }
 
@@ -404,7 +412,8 @@ bool db_get_level_bounds(struct db *db, uint32_t *min_level, uint32_t *max_level
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_ROW) {
-        LOG_ERROR("db_get_level_bounds step failed: %d", rc);
+        LOG_ERROR("step failed: %d", rc);
+        sqlite3_finalize(stmt);
         return false;
     }
 
@@ -412,7 +421,6 @@ bool db_get_level_bounds(struct db *db, uint32_t *min_level, uint32_t *max_level
     *max_level = sqlite3_column_int(stmt, 1);
 
     sqlite3_finalize(stmt);
-
     return true;
 }
 
@@ -421,23 +429,23 @@ bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field) {
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db->db, "SELECT field FROM level WHERE id = ?;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_level_field_utf8 prepare failed: %d", rc);
+        LOG_ERROR("prepare failed: %d", rc);
         return false;
     }
 
     rc = sqlite3_bind_int(stmt, 1, (int)id);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_get_level_field_utf8 bind failed: %d", rc);
-        return false;
+        LOG_ERROR("bind failed: %d", rc);
+        goto fail;
     }
 
     rc = sqlite3_step(stmt);
     if (rc == SQLITE_DONE) {
         LOG_ERROR("Failed to find level %d", id);
-        return false;
+        goto fail;
     } else if (rc != SQLITE_ROW) {
-        LOG_ERROR("db_get_level_field_utf8 step failed: %d", rc);
-        return false;
+        LOG_ERROR("step failed: %d", rc);
+        goto fail;
     }
 
     uint8_t const *data = sqlite3_column_text(stmt, 0);
@@ -445,29 +453,32 @@ bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field) {
 
     *field = malloc(len + 1);
     if (*field == NULL) {
-        LOG_ERROR("db_get_level_field_utf8 malloc failed: %d", errno);
-        return false;
+        LOG_ERROR("malloc failed: %d", errno);
+        goto fail;
     }
     memcpy(*field, data, len);
     (*field)[len] = '\0';
 
     sqlite3_finalize(stmt);
-
     return true;
+
+    fail:
+    sqlite3_finalize(stmt);
+    return false;
 }
 
 bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadata *metadata) {
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db->db, "INSERT INTO level (name, field) VALUES (?, ?) RETURNING id, creation_timestamp;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_create_level_utf8 prepare failed: %d", rc);
+        LOG_ERROR("prepare failed: %d", rc);
         return false;
     }
 
     rc = sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT);
     if (rc != SQLITE_OK) {
-        LOG_ERROR("db_create_level_utf8 bind name failed: %d", rc);
-        return false;
+        LOG_ERROR("bind name failed: %d", rc);
+        goto fail;
     }
 
     //TODO get field into a better form
@@ -480,22 +491,18 @@ bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadat
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
         LOG_ERROR("db_create_level_utf8 step failed: %d", rc);
-        return false;
+        goto fail;
     }
 
     //TODO build the level using the returned data
 
-
-
+    sqlite3_finalize(stmt);
     return true;
-}
 
-//                                     "    id INTEGER NOT NULL PRIMARY KEY,"
-//                                    "    level_id INTEGER NOT NULL,"
-//                                    "    ticks INTEGER NOT NULL,"
-//                                    "    end_state TEXT NOT NULL,"
-//                                    "    input_log TEXT NOT NULL,"
-//                                    "    timestamp INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+    fail:
+    sqlite3_finalize(stmt);
+    return false;
+}
 
 bool db_insert_attempt(struct db *db, uint32_t level_id, uint32_t ticks, enum game_state game_state, char *input_log) {
     LOG_DEBUG("Logging attempt of %d: %d ticks, %s", level_id, ticks, game_state_to_str(game_state));

@@ -147,19 +147,19 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
     if (*len >= 3 &&
         ((*buf)[1] == *WILL || (*buf)[1] == *WONT ||
                 (*buf)[1] == *DO || (*buf)[1] == *DONT)) {
-        uint8_t action = (*buf)[1];
-        uint8_t option_code = (*buf)[2];
+        char const action = (*buf)[1];
+        uint8_t const option_code = (*buf)[2];
 
-        // "Negotiate About Window Size"
-        if (option_code == *NAWS) {
-            terminal->will_naws = ((*buf)[1] == *WILL);
-        }
-
-        char const *option_name = negotiable_option_names[option_code];
+        char const * const option_name = negotiable_option_names[option_code];
         LOG_DEBUG("Received Telnet negotiation: IAC %s %s(%u)",
                   action == *WILL ? "WILL" : action == *WONT ? "WONT" : action == *DO ? "DO" : action == *DONT ? "DONT" : "???",
                   option_name == NULL ? "???" : option_name,
                   (uint8_t) option_code);
+
+        // "Negotiate About Window Size"
+        if (option_code == *NAWS) {
+            terminal->will_naws = (action == *WILL);
+        }
 
         *buf += 3;
         *len -= 3;
@@ -169,7 +169,14 @@ static bool parse_telnet_command(struct terminal *terminal, char **buf, size_t *
     // Sub-options:
     // IAC SB <option> <values...> IAC SE
     if (*len >= 5 && (*buf)[1] == *SB) {
-        if ((*buf)[2] == *NAWS) {
+        uint8_t const option_code = (*buf)[2];
+
+        char const * const option_name = negotiable_option_names[option_code];
+        LOG_DEBUG("Received Telnet sub-negotiation: IAC SB %s(%u) ...",
+                  option_name == NULL ? "???" : option_name,
+                  (uint8_t) option_code);
+
+        if (option_code == *NAWS) {
             char *original_buf = *buf;
             size_t original_len = *len;
             *buf += 3;
