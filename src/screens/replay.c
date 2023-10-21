@@ -174,6 +174,34 @@ bool replay_screen_update(void *data, struct state *state, struct env *env) {
         canvas_write(&state->canvas, x_offset + 29, y_offset + 12, "press space to continue");
     }
 
+    if (x_offset > 2 && y_offset > 3) {
+        canvas_foreground(&state->canvas, default_color);
+        canvas_background(&state->canvas, default_color);
+
+        //canvas_rect(&state->canvas, x_offset - 1, y_offset - 1, COLUMNS + 2, ROWS + 2, ' ');
+
+        canvas_line(&state->canvas, x_offset, y_offset - 1, x_offset + COLUMNS - 1, y_offset - 1, '-');
+        canvas_line(&state->canvas, x_offset, y_offset + ROWS, x_offset + COLUMNS - 1, y_offset + ROWS, '-');
+        canvas_line(&state->canvas, x_offset - 1, y_offset, x_offset - 1, y_offset + ROWS - 1, '|');
+        canvas_line(&state->canvas, x_offset + COLUMNS, y_offset, x_offset + COLUMNS, y_offset + ROWS - 1, '|');
+        for (int horiz = 0; horiz < 2; horiz++) {
+            for (int vert = 0; vert < 2; vert++) {
+                canvas_put(&state->canvas,
+                           x_offset - 1 + horiz * (COLUMNS + 1),
+                           y_offset - 1 + vert * (ROWS + 1),
+                           '+');
+            }
+        }
+
+        char buf[128] = {0};
+        snprintf(buf, sizeof(buf), "%5d ticks", screen->game.tick);
+
+        canvas_write(&state->canvas, x_offset, y_offset + ROWS + 1, buf);
+
+        screen->game.input_log[screen->game.input_log_len] = '\0';
+        canvas_write_block(&state->canvas, x_offset, y_offset + ROWS + 2, COLUMNS, 3, screen->game.input_log);
+    }
+
     // Resend the entire canvas every so many ticks
     if (state->num_ticks % 100 == 99) {
         canvas_force_next_flush(&state->canvas);

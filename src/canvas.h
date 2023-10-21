@@ -88,6 +88,9 @@ void canvas_fill(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
 void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol);
 
+void canvas_line(struct canvas *canvas, unsigned x0, unsigned y0, unsigned x1, unsigned y1,
+                 unsigned long symbol);
+
 void canvas_reset(struct canvas *canvas);
 
 //void canvas_italic(struct canvas *canvas, bool state);

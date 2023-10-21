@@ -22,9 +22,10 @@ struct termios orig_termios;
 volatile sig_atomic_t running = true;
 
 void handle_signal(int signal_num) {
-    LOG_DEBUG("Got signal %d", signal_num);
-
-    running = false;
+    if (signal_num == SIGKILL) {
+        LOG_INFO("Got SIGKILL");
+        running = false;
+    }
 }
 
 void enter_raw_mode(void) {

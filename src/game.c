@@ -515,7 +515,7 @@ enum game_state game_update(struct game *game, struct directional_input *input) 
             game->ticks_without_input = 0;
         }
 
-        if (game->input_log_len >= INPUT_LOG_LEN) {
+        if (game->input_log_len >= INPUT_LOG_LEN - 1) {
             LOG_ERROR("Outgrew input log (%d bytes)!", game->input_log_len);
         } else {
             // Order matters: the game logic consistently prefers L > R > U > D

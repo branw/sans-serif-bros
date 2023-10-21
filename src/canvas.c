@@ -291,6 +291,52 @@ void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
     canvas->flush_index = 0;
 }
 
+void canvas_line(struct canvas *canvas, unsigned x0, unsigned y0, unsigned x1, unsigned y1,
+                 unsigned long symbol) {
+    ASSERT(x0 <= canvas->w);
+    ASSERT(x1 <= canvas->w);
+    ASSERT(y0 <= canvas->h);
+    ASSERT(y1 <= canvas->h);
+
+    struct cell new_cell = canvas->style;
+    new_cell.code_point = symbol;
+
+    // Bresenham's line algorithm
+    // From https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+    int const dx = abs((int)x0 - (int)x1);
+    int const sx = x0 < x1 ? 1 : -1;
+    int const dy = -abs((int)y0 - (int)y1);
+    int const sy = y0 < y1 ? 1 : -1;
+
+    int x = (int)x0;
+    int y = (int)y0;
+    int error = dx + dy;
+    for (;;) {
+        canvas->buf[1][x + y * canvas->w] = new_cell;
+        if (x == x1 && y == y1) {
+            break;
+        }
+
+        int const e2 = error * 2;
+        if (e2 >= dy) {
+            if (x == x1) {
+                break;
+            }
+            error += dy;
+            x += sx;
+        }
+        if (e2 <= dx) {
+            if (y == y1) {
+                break;
+            }
+            error += dx;
+            y += sy;
+        }
+    }
+
+    canvas->flush_index = 0;
+}
+
 void canvas_reset(struct canvas *canvas) {
     CANVAS_CELL_CLEAR(canvas->style);
     canvas->style.background = default_color;
