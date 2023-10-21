@@ -4,6 +4,7 @@
 #include <memory.h>
 #include "canvas.h"
 #include "util.h"
+#include "log.h"
 
 void canvas_create(struct canvas *canvas, unsigned w, unsigned h) {
     // Allocate the two buffers
@@ -180,7 +181,7 @@ void canvas_force_next_flush(struct canvas *canvas) {
 
 void canvas_write(struct canvas *canvas, unsigned x, unsigned y, char *msg) {
     unsigned len = strlen(msg);
-    assert(y + len <= canvas->w);
+    ASSERT(y + len <= canvas->w);
 
     struct cell *cell = &canvas->buf[1][x + y * canvas->w];
     for (unsigned i = 0; i < len; i++, cell++, msg++) {
@@ -192,13 +193,13 @@ void canvas_write(struct canvas *canvas, unsigned x, unsigned y, char *msg) {
 
 void canvas_write_block(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
                               unsigned h, char *buf) {
-    assert(x1 + w <= canvas->w);
-    assert(y1 + h <= canvas->h);
-    assert(strlen(buf) == w * h);
+    ASSERT(x1 + w <= canvas->w);
+    ASSERT(y1 + h <= canvas->h);
+    ASSERT(strlen(buf) <= w * h);
 
-    for (unsigned y = y1; y < y1 + h; y++) {
+    for (unsigned y = y1; y < y1 + h && *buf != '\0'; y++) {
         struct cell *cell = &canvas->buf[1][x1 + y * canvas->w];
-        for (unsigned x = x1; x < x1 + w; x++, buf++, cell++) {
+        for (unsigned x = x1; x < x1 + w && *buf != '\0'; x++, buf++, cell++) {
             struct cell new_cell = canvas->style;
             new_cell.code_point = (uint8_t)*buf;
             *cell = new_cell;
@@ -209,7 +210,7 @@ void canvas_write_block(struct canvas *canvas, unsigned x1, unsigned y1, unsigne
 }
 
 void canvas_write_utf8(struct canvas *canvas, unsigned x, unsigned y, char *msg) {
-    assert(false);
+    ASSERT(false);
 
     /*
     struct canvas *window = canvas;
@@ -225,8 +226,8 @@ void canvas_write_utf8(struct canvas *canvas, unsigned x, unsigned y, char *msg)
 
 void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, unsigned w,
                               unsigned h, uint32_t *buf, size_t len) {
-    assert(x1 + w <= canvas->w);
-    assert(y1 + h <= canvas->h);
+    ASSERT(x1 + w <= canvas->w);
+    ASSERT(y1 + h <= canvas->h);
 
     for (unsigned y = y1; y < y1 + h; y++) {
         struct cell *cell = &canvas->buf[1][x1 + y * canvas->w];
@@ -241,8 +242,8 @@ void canvas_write_block_utf32(struct canvas *canvas, unsigned x1, unsigned y1, u
 }
 
 void canvas_put(struct canvas *canvas, unsigned x, unsigned y, unsigned long c) {
-    assert(x < canvas->w);
-    assert(y < canvas->h);
+    ASSERT(x < canvas->w);
+    ASSERT(y < canvas->h);
 
     struct cell new_cell = canvas->style;
     new_cell.code_point = c;
@@ -257,8 +258,8 @@ unsigned long canvas_get(struct canvas *canvas, unsigned x, unsigned y) {
 
 void canvas_fill(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol) {
-    assert(x + w <= canvas->w);
-    assert(y + h <= canvas->h);
+    ASSERT(x + w <= canvas->w);
+    ASSERT(y + h <= canvas->h);
 
     struct cell new_cell = canvas->style;
     new_cell.code_point = symbol;
@@ -274,8 +275,8 @@ void canvas_fill(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsi
 
 void canvas_rect(struct canvas *canvas, unsigned x, unsigned y, unsigned w, unsigned h,
                  unsigned long symbol) {
-    assert(x + w <= canvas->w);
-    assert(y + h <= canvas->h);
+    ASSERT(x + w <= canvas->w);
+    ASSERT(y + h <= canvas->h);
 
     struct cell new_cell = canvas->style;
     new_cell.code_point = symbol;
