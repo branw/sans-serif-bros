@@ -15,7 +15,8 @@ find_package(unofficial-sqlite3 CONFIG REQUIRED)
 set(SOURCES
         src/server.c src/session.c src/state.c src/terminal.c src/game.c
         src/util.c src/canvas.c src/db.c src/screen.c src/log.c
-        src/screens/title.c src/screens/levels.c src/screens/game.c)
+        src/screens/title.c src/screens/levels.c src/screens/game.c
+        src/screens/replay.c)
 
 add_executable(ssb src/main.c ${SOURCES})
 target_include_directories(ssb PRIVATE src ext/baro)

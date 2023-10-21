@@ -10,6 +10,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdint.h>
 #include <sqlite3.h>
+#include "game.h"
 
 struct metadata {
     // Number of the level, starting at 1 and not necessarily continuous,
@@ -41,6 +42,15 @@ struct level {
     uint32_t *field;
 };
 
+struct attempt {
+    uint32_t level_id;
+
+    enum game_state game_state;
+
+    uint32_t ticks;
+    char *input_log;
+};
+
 struct db {
     sqlite3 *db;
 };
@@ -61,9 +71,11 @@ bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field);
 
 bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadata *metadata);
 
-enum game_state;
+bool db_get_best_attempt(struct db *db, uint32_t level_id, uint32_t *attempt_id);
 
-bool db_insert_attempt(struct db *db, uint32_t level_id, uint32_t ticks, enum game_state game_state, char *input_log);
+bool db_get_attempt(struct db *db, uint32_t id, struct attempt *attempt);
+
+bool db_insert_attempt(struct db *db, struct attempt *attempt);
 
 #ifdef __cplusplus
 }

@@ -240,11 +240,20 @@ static bool migrate(sqlite3 *db, char *levels_path) {
                                     "COMMIT;");
             // fallthrough
 
-        case CURRENT_VERSION:
+        case CURRENT_VERSION: {
+            // Sanity check
+            uint32_t const upgraded_version = get_user_version(db);
+            if (upgraded_version != CURRENT_VERSION) {
+                LOG_ERROR("Failed to migrate database (current version %d, expected version %d)",
+                          upgraded_version, CURRENT_VERSION);
+                return false;
+            }
+
             if (should_load_levels) {
                 return load_levels(db, levels_path);
             }
             return true;
+        }
 
         default:
             LOG_ERROR("Unknown user version %d", user_version);
@@ -270,6 +279,10 @@ bool db_create(struct db *db, char *path, char *levels_path) {
 }
 
 void db_destroy(struct db *db) {
+    LOG_DEBUG("Vacuuming database");
+    execute_many_statements(db->db, "VACUUM;");
+    LOG_DEBUG("Vacuum completed");
+
     sqlite3_close(db->db);
 }
 
@@ -469,13 +482,15 @@ bool db_get_level_field_utf8(struct db *db, uint32_t id, char **field) {
 
 bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadata *metadata) {
     sqlite3_stmt *stmt = NULL;
-    int rc = sqlite3_prepare_v2(db->db, "INSERT INTO level (name, field) VALUES (?, ?) RETURNING id, creation_timestamp;", -1, &stmt, NULL);
+    int rc = sqlite3_prepare_v2(db->db,
+                                "INSERT INTO level (name, field) VALUES (?, ?) RETURNING id, creation_timestamp;",
+                                -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         LOG_ERROR("prepare failed: %d", rc);
         return false;
     }
 
-    rc = sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT);
+    rc = sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
     if (rc != SQLITE_OK) {
         LOG_ERROR("bind name failed: %d", rc);
         goto fail;
@@ -504,11 +519,9 @@ bool db_create_level_utf8(struct db *db, char *name, char *field, struct metadat
     return false;
 }
 
-bool db_insert_attempt(struct db *db, uint32_t level_id, uint32_t ticks, enum game_state game_state, char *input_log) {
-    LOG_DEBUG("Logging attempt of %d: %d ticks, %s", level_id, ticks, game_state_to_str(game_state));
-
+bool db_get_best_attempt(struct db *db, uint32_t level_id, uint32_t *attempt_id) {
     sqlite3_stmt *stmt = NULL;
-    int rc = sqlite3_prepare_v2(db->db, "INSERT INTO attempt (level_id, ticks, end_state, input_log) VALUES (?, ?, ?, ?);", -1, &stmt, NULL);
+    int rc = sqlite3_prepare_v2(db->db, "SELECT id FROM attempt WHERE level_id = ? AND end_state = \"won\" ORDER BY ticks ASC LIMIT 1;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         LOG_ERROR("prepare failed: %d", rc);
         return false;
@@ -516,23 +529,114 @@ bool db_insert_attempt(struct db *db, uint32_t level_id, uint32_t ticks, enum ga
 
     rc = sqlite3_bind_int(stmt, 1, (int) level_id);
     if (rc != SQLITE_OK) {
+        LOG_ERROR("bind failed: %d", rc);
+        goto fail;
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_DONE) {
+        goto fail;
+    } else if (rc != SQLITE_ROW) {
+        LOG_ERROR("step failed: %d", rc);
+        goto fail;
+    }
+
+    *attempt_id = sqlite3_column_int(stmt, 0);
+
+    sqlite3_finalize(stmt);
+    return true;
+
+    fail:
+    sqlite3_finalize(stmt);
+    return false;
+}
+
+bool db_get_attempt(struct db *db, uint32_t id, struct attempt *attempt) {
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db->db, "SELECT level_id, ticks, input_log FROM attempt WHERE id = ?;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("prepare failed: %d", rc);
+        return false;
+    }
+
+    rc = sqlite3_bind_int(stmt, 1, (int) id);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("bind failed: %d", rc);
+        goto fail;
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_DONE) {
+        goto fail;
+    } else if (rc != SQLITE_ROW) {
+        LOG_ERROR("step failed: %d", rc);
+        goto fail;
+    }
+
+    attempt->level_id = sqlite3_column_int(stmt, 0);
+    attempt->ticks = sqlite3_column_int(stmt, 1);
+
+    //TODO
+    attempt->game_state = GAME_STATE_WON;
+
+    uint8_t const *input_log_data = sqlite3_column_text(stmt, 2);
+    size_t const input_log_len = sqlite3_column_bytes(stmt, 2);
+
+    attempt->input_log = malloc(input_log_len + 1);
+    if (attempt->input_log == NULL) {
+        LOG_ERROR("malloc failed: %d", errno);
+        goto fail;
+    }
+    memcpy(attempt->input_log, input_log_data, input_log_len);
+    attempt->input_log[input_log_len] = '\0';
+
+    sqlite3_finalize(stmt);
+    return true;
+
+    fail:
+    sqlite3_finalize(stmt);
+    return false;
+}
+
+bool db_insert_attempt(struct db *db, struct attempt *attempt) {
+    LOG_DEBUG("Logging attempt of level %d: %d ticks, %s", attempt->level_id, attempt->ticks, game_state_to_str(attempt->game_state));
+
+    if (attempt->game_state != GAME_STATE_WON &&
+            attempt->game_state != GAME_STATE_DIED &&
+            attempt->game_state != GAME_STATE_QUIT &&
+            attempt->game_state != GAME_STATE_RETRIED) {
+        LOG_ERROR("Attempt has invalid game state %d (\"%s\")", attempt->game_state, game_state_to_str(attempt->game_state));
+        return false;
+    }
+
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(db->db,
+                                "INSERT INTO attempt (level_id, ticks, end_state, input_log) VALUES (?, ?, ?, ?);",
+                                -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("prepare failed: %d", rc);
+        return false;
+    }
+
+    rc = sqlite3_bind_int(stmt, 1, (int) attempt->level_id);
+    if (rc != SQLITE_OK) {
         LOG_ERROR("bind level_id failed: %d", rc);
         goto fail;
     }
 
-    rc = sqlite3_bind_int(stmt, 2, (int) ticks);
+    rc = sqlite3_bind_int(stmt, 2, (int) attempt->ticks);
     if (rc != SQLITE_OK) {
         LOG_ERROR("bind ticks failed: %d", rc);
         goto fail;
     }
 
-    rc = sqlite3_bind_text(stmt, 3, game_state_to_str(game_state), -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(stmt, 3, game_state_to_str(attempt->game_state), -1, SQLITE_STATIC);
     if (rc != SQLITE_OK) {
         LOG_ERROR("bind game_state failed: %d", rc);
         goto fail;
     }
 
-    rc = sqlite3_bind_text(stmt, 4, input_log, -1, SQLITE_STATIC);
+    rc = sqlite3_bind_text(stmt, 4, attempt->input_log, -1, SQLITE_STATIC);
     if (rc != SQLITE_OK) {
         LOG_ERROR("bind input_log failed: %d", rc);
         goto fail;

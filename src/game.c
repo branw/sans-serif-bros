@@ -571,6 +571,7 @@ char const *game_state_to_str(enum game_state game_state) {
         case GAME_STATE_WON: return "won";
         case GAME_STATE_DIED: return "died";
         case GAME_STATE_QUIT: return "quit";
-        default: assert(false);
+        case GAME_STATE_RETRIED: return "retried";
+        default: return "<unknown game_state>";
     }
 }

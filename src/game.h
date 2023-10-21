@@ -31,6 +31,7 @@ enum game_state {
     GAME_STATE_WON = 1,
     GAME_STATE_DIED,
     GAME_STATE_QUIT,
+    GAME_STATE_RETRIED,
 };
 
 bool game_parse_and_validate_field(char *field_str, uint32_t *field);

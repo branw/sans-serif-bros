@@ -33,7 +33,13 @@ static const char *level_colors[6] = {
         [LOG_LEVEL_FATAL] = "\x1b[40m\x1b[37m", // Black background, white foreground
 };
 
+// ID of the currently executing session
 _Atomic uint64_t ctx_session_id = 0;
+
+// Handle to current log file
+_Atomic FILE *log_file = 0;
+// Creation timestamp of the current log file (aligned to the previous hour)
+_Atomic uint64_t last_log_rotation = 0;
 
 void log_push_context(uint64_t session_id) {
     if (ctx_session_id != 0) {

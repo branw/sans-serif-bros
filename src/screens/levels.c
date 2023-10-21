@@ -7,6 +7,7 @@
 #include "levels.h"
 #include "game.h"
 #include "log.h"
+#include "replay.h"
 
 struct screen_impl level_pit_screen_impl = {
         .update=level_pit_screen_update
@@ -106,13 +107,18 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
             snprintf_time_in_ticks(best_time_buf, sizeof(best_time_buf), metadata[i].min_ticks);
         }
 
+        double win_rate = 0;
+        if (metadata[i].num_attempts > 0) {
+            win_rate = ((double)metadata[i].num_wins / metadata[i].num_attempts) * 100;
+        }
+
         char buf[80];
         snprintf(buf, 80, "%5d %-12s %10s %7d  %5.01f%% %9s",
                 metadata[i].id,
                 metadata[i].name,
                 creation_time_buf,
                 metadata[i].num_attempts,
-                metadata[i].num_attempts == 0 ? 0 : ((double)metadata[i].num_wins / metadata[i].num_attempts) * 100,
+                win_rate,
                 best_time_buf);
 
         if (i == screen->selected_index) {
@@ -141,15 +147,13 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
     // Handle input
     if (state->terminal.keyboard.space || state->terminal.keyboard.enter) {
         state_push_screen(state, game_screen_create(env, selected_id));
-    }
-    else if (state->terminal.keyboard.up) {
+    } else if (state->terminal.keyboard.up) {
         if (screen->selected_index > 0) {
             screen->selected_index--;
         } else if (screen->top_id > min_id) {
             screen->top_id = db_get_previous_level(env->db, screen->top_id);
         }
-    }
-    else if (state->terminal.keyboard.down) {
+    } else if (state->terminal.keyboard.down) {
         if (screen->selected_index < num_levels - 1) {
             screen->selected_index++;
         } else if (num_levels == 16 && metadata[num_levels - 1].id < max_id) {
@@ -157,6 +161,17 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
         }
     } else if (state->terminal.keyboard.esc) {
         return false;
+    } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
+        if (metadata[screen->selected_index].num_wins == 0) {
+            LOG_ERROR("No wins");
+        } else {
+            uint32_t attempt_id = 0;
+            if (!db_get_best_attempt(env->db, selected_id, &attempt_id)) {
+                LOG_ERROR("Couldn't find best attempt for level %d", selected_id);
+            } else {
+                state_push_screen(state, replay_screen_create(env, attempt_id));
+            }
+        }
     }
 
     KEYBOARD_CLEAR(state->terminal.keyboard);

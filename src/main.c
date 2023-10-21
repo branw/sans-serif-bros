@@ -206,6 +206,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    LOG_DEBUG("Initializing ssb version " VERSION);
+
     if (standalone && !strncmp(port, DEFAULT_PORT, sizeof(DEFAULT_PORT))) {
         LOG_ERROR("Port cannot be specified in standalone mode");
         return EXIT_FAILURE;
@@ -224,13 +226,12 @@ int main(int argc, char *argv[]) {
     action.sa_handler = handle_signal;
     sigaction(SIGTERM, &action, NULL);
 
+    LOG_INFO("Running in %s mode", standalone ? "standalone" : "server");
     int rc = standalone ? run_standalone(&db) : run_server(&db, port);
 
     LOG_INFO("Saving database");
-
     db_destroy(&db);
 
-    LOG_INFO("Shutdown complete");
-
+    LOG_INFO("Shutdown complete. Exiting with code %d", rc);
     return rc;
 }

@@ -54,16 +54,31 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     // Allow flashes of color during transitions
     bool color = true;
 
+    // If the player is actively playing, consider this a legitimate attempt
+    // and record it, even if the player retries or quits
+    bool const should_record_attempt = screen->game.input_log_len > 5 &&
+            !(screen->game.win || screen->game.die);
+
     // Handle inputs
     if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
+        struct attempt attempt = {
+                .game_state = GAME_STATE_RETRIED,
+                .level_id = screen->level_id,
+                .ticks = screen->game.tick,
+                .input_log = screen->game.input_log,
+        };
+        if (should_record_attempt && !db_insert_attempt(env->db, &attempt)) {
+            LOG_ERROR("Failed to record retried attempt");
+        }
+
         char *field = NULL;
         if (!db_get_level_field_utf8(env->db, screen->level_id, &field)) {
-            LOG_ERROR("Failed to get level!");
+            LOG_ERROR("Failed to get level %d for retry", screen->level_id);
             return false;
         }
 
         if (!game_create_from_utf8(&screen->game, field)) {
-            LOG_ERROR("Failed to create game");
+            LOG_ERROR("Failed to create game for retry of level %d", screen->level_id);
             return false;
         }
 
@@ -73,12 +88,16 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_foreground(&state->canvas, blue);
         canvas_background(&state->canvas, blue);
     } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'Q')) {
-        // Log quit games as failed attempts, but only if the player has
-        // actually made any inputs
-        bool const has_played_level = screen->game.input_log_len > 5;
-        if (has_played_level && !db_insert_attempt(env->db, screen->level_id, screen->game.tick, GAME_STATE_QUIT, screen->game.input_log)) {
+        struct attempt attempt = {
+                .game_state = GAME_STATE_QUIT,
+                .level_id = screen->level_id,
+                .ticks = screen->game.tick,
+                .input_log = screen->game.input_log,
+        };
+        if (should_record_attempt && !db_insert_attempt(env->db, &attempt)) {
             LOG_ERROR("Failed to record quit attempt");
         }
+
         return false;
     } else if (state->terminal.keyboard.space && screen->game.win) {
         char *field = NULL;
@@ -105,7 +124,13 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     enum game_state game_state = game_update(&screen->game, &input);
     if (game_state != screen->last_game_state) {
         if (game_state != GAME_STATE_IN_PROGRESS) {
-            if (!db_insert_attempt(env->db, screen->level_id, screen->game.tick, game_state, screen->game.input_log)) {
+            struct attempt attempt = {
+                    .game_state = game_state,
+                    .level_id = screen->level_id,
+                    .ticks = screen->game.tick,
+                    .input_log = screen->game.input_log,
+            };
+            if (!db_insert_attempt(env->db, &attempt)) {
                 LOG_ERROR("Failed to record attempt");
             }
         }
