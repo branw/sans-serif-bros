@@ -504,6 +504,14 @@ static void process_frame_8(struct game *state) {
 }
 
 enum game_state game_update(struct game *game, struct directional_input *input) {
+    // Exit early if the game is already over to avoid mutating the state
+    if (game->win) {
+        return GAME_STATE_WON;
+    } else if (game->die) {
+        return GAME_STATE_DIED;
+    }
+
+    // Process input
     game->input = *input;
 
     if (input->left || input->right || input->up || input->down) {
@@ -528,12 +536,7 @@ enum game_state game_update(struct game *game, struct directional_input *input) 
         game->ticks_without_input++;
     }
 
-    if (game->win) {
-        return GAME_STATE_WON;
-    } else if (game->die) {
-        return GAME_STATE_DIED;
-    }
-
+    // Process the game field
     memcpy(game->next_field, game->field, ROWS * COLUMNS * sizeof(uint32_t));
 
     if (game->reverse) {
