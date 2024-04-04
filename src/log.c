@@ -1,6 +1,8 @@
 #include <stdarg.h>
 #include <time.h>
 #include <stdio.h>
+#include <execinfo.h>
+#include <stdlib.h>
 #include "log.h"
 #include "config.h"
 
@@ -94,4 +96,29 @@ void log_printf(enum log_level level, char const *file, int line, char const *fu
     print_log_line(stdout, &log_line);
 
     va_end(log_line.ap);
+}
+
+void log_stacktrace(enum log_level level, char const *file, int line, char const *func, char const *format, ...) {
+    char *result = NULL;
+    size_t resultSize = 0;
+    FILE * const stream = open_memstream(&result, &resultSize);
+
+    va_list ap;
+    va_start(ap, format);
+    vfprintf(stream, format, ap);
+    va_end(ap);
+
+    void *callstack[128];
+    int const num_frames = backtrace(callstack, 128);
+    char ** const callstack_strs = backtrace_symbols(callstack, num_frames);
+    for (int i = 0; i < num_frames; ++i) {
+        fprintf(stream, "%s\n", callstack_strs[i]);
+    }
+    free(callstack_strs);
+
+    fclose(stream);
+
+    log_printf(level, file, line, func, result);
+
+    free(result);
 }

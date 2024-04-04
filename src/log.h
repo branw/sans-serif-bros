@@ -28,7 +28,9 @@ void log_printf(enum log_level level, char const *file, int line, char const *fu
 #define LOG_ERROR(...) log_printf(LOG_LEVEL_ERROR, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 #define LOG_FATAL(...) log_printf(LOG_LEVEL_FATAL, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
-#define ASSERT(X) (__builtin_expect(!(X), 0) ? LOG_FATAL("Assertion failed: %s", #X), assert(X) : (void)0)
+void log_stacktrace(enum log_level level, char const *file, int line, char const *func, char const *format, ...);
+
+#define ASSERT(X) (__builtin_expect(!(X), 0) ? log_stacktrace(LOG_LEVEL_FATAL, __FILE__, __LINE__, __FUNCTION__, "Assertion failed: %s\n", #X), abort() : (void)0)
 
 #ifdef __cplusplus
 }
