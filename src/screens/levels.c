@@ -159,7 +159,7 @@ bool level_pit_screen_update(void *data, struct state *state, struct env *env) {
         } else if (num_levels == 16 && metadata[num_levels - 1].id < max_id) {
             screen->top_id = metadata[1].id;
         }
-    } else if (state->terminal.keyboard.esc) {
+    } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'Q')) {
         return false;
     } else if (KEYBOARD_KEY_PRESSED(state->terminal.keyboard, 'R')) {
         if (metadata[screen->selected_index].num_wins == 0) {
