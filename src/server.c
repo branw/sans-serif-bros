@@ -1,10 +1,8 @@
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include "server.h"
@@ -72,8 +70,8 @@ void server_destroy(struct server *server) {
     }
 
     // Prevent anymore sending on the socket
-    int result = shutdown(server->socket, SHUT_WR);
-    if (result == -1) {
+    int result = shutdown(server->socket, SHUT_RDWR);
+    if (result == -1 && errno != ENOTCONN) {
         LOG_ERROR("shutdown failed (%d: %s)", errno, strerror(errno));
     }
 
