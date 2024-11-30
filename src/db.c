@@ -1,3 +1,4 @@
+#include <baro.h>
 #include <memory.h>
 #include <dirent.h>
 #include <sqlite3.h>
@@ -10,9 +11,9 @@
 
 #define CURRENT_VERSION 2
 
-static int get_user_version(sqlite3 *db) {
+static int read_int(sqlite3 *db, char const *query) {
     sqlite3_stmt *stmt = NULL;
-    int rc = sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt, 0);
+    int rc = sqlite3_prepare_v2(db, query, -1, &stmt, 0);
     if (rc != SQLITE_OK) {
         LOG_ERROR("prepare failed: %d", rc);
         return -1;
@@ -25,10 +26,26 @@ static int get_user_version(sqlite3 *db) {
         return -1;
     }
 
-    int user_version = sqlite3_column_int(stmt, 0);
+    int const value = sqlite3_column_int(stmt, 0);
 
     sqlite3_finalize(stmt);
-    return user_version;
+    return value;
+}
+
+static int get_user_version(sqlite3 *db) {
+    return read_int(db, "PRAGMA user_version;");
+}
+
+struct db_stats {
+    uint32_t user_version;
+    uint32_t num_levels;
+    uint32_t num_attempts;
+};
+
+static void get_db_stats(sqlite3 *db, struct db_stats *db_stats) {
+    db_stats->user_version = get_user_version(db);
+    db_stats->num_levels = read_int(db, "SELECT COUNT(*) FROM level;");
+    db_stats->num_attempts = read_int(db, "SELECT COUNT(*) FROM attempt;");
 }
 
 // Executes a multi-statement SQL query, without grabbing any results
@@ -70,7 +87,7 @@ static bool read_and_validate_level(char *path, char **field_str) {
     fseek(f, 0, SEEK_SET);
 
     *field_str = malloc(len + 1);
-    if (field_str == NULL) {
+    if (*field_str == NULL) {
         LOG_ERROR("malloc failed: %d", errno);
         fclose(f);
         return false;
@@ -192,15 +209,15 @@ static bool load_levels(sqlite3 *db, char *levels_path) {
 static bool migrate(sqlite3 *db, char *levels_path) {
     int user_version = get_user_version(db);
     if (user_version == -1) {
-        LOG_ERROR("Failed to get DB version");
+        LOG_ERROR("Failed to get database version");
         return false;
     }
 
     if (user_version == CURRENT_VERSION) {
-        LOG_INFO("DB is already the latest version (%d)", user_version);
+        LOG_DEBUG("Database is already the latest version (%d); no migration needed", user_version);
         return true;
     } else if (user_version > CURRENT_VERSION) {
-        LOG_ERROR("DB is at a future version (latest version is %d, but the database is version %d)",
+        LOG_ERROR("Database is at a future version (latest version is %d, but the database is version %d)",
                 user_version, CURRENT_VERSION);
         return false;
     }
@@ -212,7 +229,7 @@ static bool migrate(sqlite3 *db, char *levels_path) {
         // Create a level table
         case 0:
             should_load_levels = true;
-            LOG_DEBUG("Migrating DB from version 0 to 1");
+            LOG_DEBUG("Migrating database from version 0 to 1");
             execute_many_statements(db,
                                     "BEGIN;"
                                     "CREATE TABLE level ("
@@ -226,7 +243,7 @@ static bool migrate(sqlite3 *db, char *levels_path) {
 
         // Track level attempts
         case 1:
-            LOG_DEBUG("Migrating DB from version 1 to 2");
+            LOG_DEBUG("Migrating database from version 1 to 2");
             execute_many_statements(db,
                                     "BEGIN;"
                                     "CREATE TABLE attempt ("
@@ -249,7 +266,7 @@ static bool migrate(sqlite3 *db, char *levels_path) {
                 return false;
             }
 
-            if (should_load_levels) {
+            if (should_load_levels && levels_path != NULL) {
                 return load_levels(db, levels_path);
             }
             return true;
@@ -261,6 +278,31 @@ static bool migrate(sqlite3 *db, char *levels_path) {
     }
 }
 
+TEST("[db] migrate") {
+    sqlite3 *db;
+    REQUIRE_EQ(SQLITE_OK, sqlite3_open(":memory:", &db));
+    REQUIRE_EQ(0, get_user_version(db));
+
+    REQUIRE(migrate(db, NULL));
+    REQUIRE_EQ(CURRENT_VERSION, get_user_version(db));
+
+    SUBTEST("migrating again does nothing") {
+        REQUIRE(migrate(db, NULL));
+        REQUIRE_EQ(CURRENT_VERSION, get_user_version(db));
+    }
+
+    SUBTEST("migrating from a future version fails") {
+        execute_many_statements(db,
+                                "BEGIN;"
+                                "PRAGMA user_version = 1337;"
+                                "COMMIT;");
+
+        REQUIRE_FALSE(migrate(db, NULL));
+    }
+
+    REQUIRE_EQ(SQLITE_OK, sqlite3_close(db));
+}
+
 bool db_create(struct db *db, char *path, char *levels_path) {
     int rc = sqlite3_open(path, &db->db);
     if (rc != SQLITE_OK) {
@@ -269,11 +311,16 @@ bool db_create(struct db *db, char *path, char *levels_path) {
     }
 
     if (!migrate(db->db, levels_path)) {
-        LOG_ERROR("DB migration failed");
+        LOG_ERROR("Database migration failed");
 
         sqlite3_close(db->db);
         return false;
     }
+
+    struct db_stats db_stats = {};
+    get_db_stats(db->db, &db_stats);
+    LOG_INFO("Database opened (version %d; %d levels, %d attempts)",
+             db_stats.user_version, db_stats.num_levels, db_stats.num_attempts);
 
     return true;
 }

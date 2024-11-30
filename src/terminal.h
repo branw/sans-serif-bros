@@ -33,8 +33,8 @@ struct keyboard_input {
     uint16_t fs;
 
     uint8_t esc : 1;
-    uint8_t tab : 1;
-    uint8_t backspace : 1;
+//    uint8_t tab : 1;
+//    uint8_t backspace : 1;
     uint8_t enter : 1;
     uint8_t space : 1;
 
@@ -43,11 +43,11 @@ struct keyboard_input {
     uint8_t left : 1;
     uint8_t right : 1;
 
-    uint8_t insert : 1;
-    uint8_t del : 1;
-    uint8_t home : 1;
-    uint8_t page_up : 1;
-    uint8_t page_down : 1;
+//    uint8_t insert : 1;
+//    uint8_t del : 1;
+//    uint8_t home : 1;
+//    uint8_t page_up : 1;
+//    uint8_t page_down : 1;
 };
 
 struct terminal {

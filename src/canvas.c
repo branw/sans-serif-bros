@@ -46,8 +46,9 @@ void canvas_resize(struct canvas *canvas, unsigned w, unsigned h) {
     canvas_create(canvas, w, h);
 
     // Copy the existing second buffer over
-    unsigned copy_w = (old.w > w) ? w : old.w, copy_h = (old.h > h) ? h : old.h;
-    for (unsigned y = 0; y < copy_h; y++) {
+    uint16_t const copy_w = (old.w > w) ? w : old.w;
+    uint16_t const copy_h = (old.h > h) ? h : old.h;
+    for (uint16_t y = 0; y < copy_h; y++) {
         memcpy(canvas->buf[1], old.buf[1], copy_w * sizeof(struct cell));
     }
 

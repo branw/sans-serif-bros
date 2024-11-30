@@ -155,15 +155,15 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     }
 
     // Draw the game field in the center of the canvas
-    unsigned int const x_offset = (state->canvas.w - 80) / 2;
-    unsigned int const y_offset = (state->canvas.h - 25) / 2;
-    canvas_write_block_utf32(&state->canvas, x_offset, y_offset, 80, 25,
+    unsigned int const x_offset = (state->canvas.w - COLUMNS) / 2;
+    unsigned int const y_offset = (state->canvas.h - ROWS) / 2;
+    canvas_write_block_utf32(&state->canvas, x_offset, y_offset, COLUMNS, ROWS,
                              (uint32_t *) screen->game.field, ROWS * COLUMNS);
 
     // Color individual cells
     if (color && game_state == GAME_STATE_IN_PROGRESS) {
-        for (unsigned y = 0; y < 25; y++) {
-            for (unsigned x = 0; x < 80; x++) {
+        for (unsigned y = 0; y < ROWS; y++) {
+            for (unsigned x = 0; x < COLUMNS; x++) {
                 unsigned long ch = screen->game.field[y][x];
                 switch (ch) {
                     case 'I':
@@ -213,7 +213,7 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
     }
 
     // Draw a border around the game
-    if (x_offset > 2 && y_offset > 3) {
+    if (x_offset >= 3 && y_offset >= 4) {
         canvas_foreground(&state->canvas, default_color);
         canvas_background(&state->canvas, default_color);
 
@@ -238,7 +238,7 @@ bool game_screen_update(void *data, struct state *state, struct env *env) {
         canvas_write(&state->canvas, x_offset, y_offset + ROWS + 1, buf);
 
         screen->game.input_log[screen->game.input_log_len] = '\0';
-        canvas_write_block(&state->canvas, x_offset, y_offset + ROWS + 2, COLUMNS, 3, screen->game.input_log);
+        canvas_write_block(&state->canvas, x_offset, y_offset + ROWS + 2, COLUMNS, 2, screen->game.input_log);
     }
 
     // Resend the entire canvas every so many ticks

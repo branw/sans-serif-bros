@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
     LOG_INFO("Running in %s mode", standalone ? "standalone" : "server");
     int rc = standalone ? run_standalone(&db) : run_server(&db, port);
 
-    LOG_INFO("Saving database");
+    LOG_INFO("Closing database");
     db_destroy(&db);
 
     LOG_INFO("Shutdown complete. Exiting with code %d", rc);
