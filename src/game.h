@@ -9,6 +9,14 @@ extern "C" {
 #include "terminal.h"
 #include "config.h"
 
+enum game_input {
+    GAME_NO_INPUT,
+    GAME_LEFT_INPUT,
+    GAME_RIGHT_INPUT,
+    GAME_UP_INPUT,
+    GAME_DOWN_INPUT,
+};
+
 struct game {
     unsigned tick;
 
@@ -19,9 +27,11 @@ struct game {
     uint32_t field[ROWS][COLUMNS];
     uint32_t next_field[ROWS][COLUMNS];
 
+    enum game_input last_input;
+    uint32_t ticks_since_input_started;
+
     char input_log[INPUT_LOG_LEN];
     size_t input_log_len;
-    uint32_t ticks_without_input;
 
     struct directional_input input;
 };

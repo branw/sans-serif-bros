@@ -3,13 +3,13 @@
 #include <dirent.h>
 #include <sqlite3.h>
 #include <errno.h>
+#include <ctype.h>
 #include "db.h"
-#include "util.h"
 #include "config.h"
 #include "game.h"
 #include "log.h"
 
-#define CURRENT_VERSION 2
+#define CURRENT_VERSION 3
 
 static int read_int(sqlite3 *db, char const *query) {
     sqlite3_stmt *stmt = NULL;
@@ -205,6 +205,160 @@ static bool load_levels(sqlite3 *db, char *levels_path) {
     return false;
 }
 
+// Convert from idle-only compression to all input compression
+static bool convert_input_log(
+        char const *old_log,
+        size_t old_log_len,
+        char *new_log,
+        size_t new_log_len) {
+    size_t read_pos = 0;
+    size_t write_pos = 0;
+
+    while (read_pos < old_log_len) {
+        // Handle numeric (idle) input
+        if (isdigit(old_log[read_pos])) {
+            int idle_count = 0;
+            while (read_pos < old_log_len && isdigit(old_log[read_pos])) {
+                idle_count = idle_count * 10 + (old_log[read_pos] - '0');
+                read_pos++;
+            }
+
+            // For single idle, just write 'I'
+            if (idle_count == 1) {
+                if (write_pos >= new_log_len) {
+                    return false;
+                }
+                new_log[write_pos++] = 'I';
+            } else {
+                // Convert number to string and add 'I'
+                int needed_digits = snprintf(NULL, 0, "%d", idle_count);
+                if (write_pos + needed_digits + 1 >= new_log_len) {
+                    return false;
+                }
+                write_pos += sprintf(new_log + write_pos, "%d", idle_count);
+                new_log[write_pos++] = 'I';
+            }
+            continue;
+        }
+
+        // Handle direction inputs (L, R, U, D)
+        char const current = old_log[read_pos];
+        int repeat_count = 1;
+        read_pos++;
+
+        // Count repeating characters
+        while (read_pos < old_log_len && old_log[read_pos] == current) {
+            repeat_count++;
+            read_pos++;
+        }
+
+        // Write the count if more than 1, then the direction
+        if (repeat_count > 1) {
+            int const needed_digits = snprintf(NULL, 0, "%d", repeat_count);
+            if (write_pos + needed_digits + 1 >= new_log_len) {
+                return false;
+            }
+            write_pos += sprintf(new_log + write_pos, "%d", repeat_count);
+        }
+
+        if (write_pos >= new_log_len) {
+            return false;
+        }
+        new_log[write_pos++] = current;
+    }
+
+    if (write_pos >= new_log_len) {
+        return false;
+    }
+    new_log[write_pos] = '\0';
+    return true;
+}
+
+TEST("[db] convert_input_log") {
+    struct {
+        char const *old_log;
+        char const *expected_new_log;
+    } cases[] = {
+            {"", ""},
+            {"1", "I"},
+            {"LRL", "LRL"},
+            {"4LLRLLL", "4I2LR3L"},
+            {"LLLL", "4L"},
+            {"LLLLLLLLLLL", "11L"},
+            {"999L", "999IL"},
+            {"1L2R3L4R5", "IL2IR3IL4IR5I"}
+    };
+
+    for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+        char const *old_log = cases[i].old_log;
+        char new_log[128] = {0};
+        REQUIRE(convert_input_log(old_log, strlen(old_log) + 1, new_log, sizeof(new_log)));
+        CHECK_STR_EQ(cases[i].expected_new_log, new_log);
+    }
+}
+
+static bool migrate_2to3_input_logs(sqlite3 *db) {
+    sqlite3_stmt *read_stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, "SELECT id, input_log FROM attempt;", -1, &read_stmt, NULL);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("prepare failed: %d", rc);
+        return false;
+    }
+
+    sqlite3_stmt *update_stmt = NULL;
+    rc = sqlite3_prepare_v2(db, "UPDATE attempt SET input_log = ? WHERE id = ?;", -1, &update_stmt, NULL);
+    if (rc != SQLITE_OK) {
+        LOG_ERROR("prepare 2 failed: %d", rc);
+        sqlite3_finalize(read_stmt);
+        return false;
+    }
+
+    while ((rc = sqlite3_step(read_stmt)) == SQLITE_ROW) {
+        int id = sqlite3_column_int(read_stmt, 0);
+        uint8_t const *old_input_log = sqlite3_column_text(read_stmt, 1);
+        size_t const input_log_len = sqlite3_column_bytes(read_stmt, 1);
+
+        char new_input_log[INPUT_LOG_LEN] = {0};
+        if (!convert_input_log((char const *)old_input_log, input_log_len, new_input_log, INPUT_LOG_LEN)) {
+            LOG_ERROR("failed to convert input log for level %d", id);
+            goto fail;
+        }
+
+        rc = sqlite3_bind_text(update_stmt, 1, new_input_log, -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) {
+            LOG_ERROR("bind name failed: %d", rc);
+            goto fail;
+        }
+
+        rc = sqlite3_bind_int(update_stmt, 2, id);
+        if (rc != SQLITE_OK) {
+            LOG_ERROR("bind id failed: %d", rc);
+            goto fail;
+        }
+
+        rc = sqlite3_step(update_stmt);
+        if (rc != SQLITE_DONE) {
+            LOG_ERROR("db_create_level_utf8 step failed: %d", rc);
+            goto fail;
+        }
+
+        sqlite3_reset(update_stmt);
+    }
+    if (rc != SQLITE_DONE) {
+        LOG_ERROR("step failed: %d", rc);
+        goto fail;
+    }
+
+    sqlite3_finalize(read_stmt);
+    sqlite3_finalize(update_stmt);
+    return true;
+
+    fail:
+    sqlite3_finalize(read_stmt);
+    sqlite3_finalize(update_stmt);
+    return false;
+}
+
 // Safely migrates a DB to the latest version
 static bool migrate(sqlite3 *db, char *levels_path) {
     int user_version = get_user_version(db);
@@ -254,6 +408,21 @@ static bool migrate(sqlite3 *db, char *levels_path) {
                                     "    input_log TEXT NOT NULL,"
                                     "    timestamp INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP);"
                                     "PRAGMA user_version = 2;"
+                                    "COMMIT;");
+            // fallthrough
+
+        // Encode level attempts more efficiently
+        case 2:
+            LOG_DEBUG("Migrating database from version 2 to 3");
+            execute_many_statements(db, "BEGIN;");
+
+            if (!migrate_2to3_input_logs(db)) {
+                execute_many_statements(db, "ROLLBACK;");
+                return false;
+            }
+
+            execute_many_statements(db,
+                                    "PRAGMA user_version = 3;"
                                     "COMMIT;");
             // fallthrough
 

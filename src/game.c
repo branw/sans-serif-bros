@@ -1,6 +1,6 @@
 #include <memory.h>
 #include <stdio.h>
-#include <assert.h>
+#include <baro.h>
 #include "game.h"
 #include "util.h"
 #include "log.h"
@@ -40,14 +40,24 @@ bool game_parse_and_validate_field(char *field_str, uint32_t *field) {
     return true;
 }
 
+TEST("[game] game_parse_and_validate_field") {
+    uint32_t field[COLUMNS * ROWS] = {0};
+
+    REQUIRE(game_parse_and_validate_field("", field));
+    REQUIRE(game_parse_and_validate_field("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n \n", field));
+    REQUIRE_FALSE(game_parse_and_validate_field("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n \n", field));
+}
+
 bool game_create_from_utf8(struct game *game, char *field_str) {
     game->tick = 0;
     game->win = game->die = game->no_money_left = false;
     game->tired = 0;
 
+    game->last_input = GAME_NO_INPUT;
+    game->ticks_since_input_started = 0;
+
     memset(game->input_log, 0, sizeof(game->input_log));
     game->input_log_len = 0;
-    game->ticks_without_input = 0;
 
     return game_parse_and_validate_field(field_str, (uint32_t *) game->field);
 }
@@ -503,6 +513,14 @@ static void process_frame_8(struct game *state) {
     }
 }
 
+static char const GAME_INPUT_TO_CHAR[] = {
+        [GAME_NO_INPUT] = 'I',
+        [GAME_LEFT_INPUT] = 'L',
+        [GAME_RIGHT_INPUT] = 'R',
+        [GAME_UP_INPUT] = 'U',
+        [GAME_DOWN_INPUT] = 'D',
+};
+
 enum game_state game_update(struct game *game, struct directional_input *input) {
     // Exit early if the game is already over to avoid mutating the state
     if (game->win) {
@@ -514,26 +532,39 @@ enum game_state game_update(struct game *game, struct directional_input *input) 
     // Process input
     game->input = *input;
 
-    if (input->left || input->right || input->up || input->down) {
-        if (game->ticks_without_input > 0) {
+    // Append input to the log
+    enum game_input const game_input =
+            input->left ? GAME_LEFT_INPUT :
+            input->right ? GAME_RIGHT_INPUT :
+            input->up ? GAME_UP_INPUT :
+            input->down ? GAME_DOWN_INPUT :
+            GAME_NO_INPUT;
+    if (game->last_input == game_input) {
+        game->ticks_since_input_started++;
+    } else if (game->input_log_len < INPUT_LOG_LEN) {
+        char const input_char = GAME_INPUT_TO_CHAR[game->last_input];
+
+        // If the last input was played for multiple ticks, log the number of
+        // ticks and then a symbol for the input
+        if (game->ticks_since_input_started > 1) {
             game->input_log_len += snprintf(
-                    game->input_log + game->input_log_len,INPUT_LOG_LEN - game->input_log_len,
-                    "%d", game->ticks_without_input);
-
-            game->ticks_without_input = 0;
+                    game->input_log + game->input_log_len,
+                    INPUT_LOG_LEN - game->input_log_len,
+                    "%d%c",
+                    game->ticks_since_input_started,
+                    input_char);
+        }
+        // If the last input was only used for one tick, just output the symbol
+        else {
+            game->input_log[game->input_log_len++] = input_char;
         }
 
-        if (game->input_log_len >= INPUT_LOG_LEN - 1) {
+        if (game->input_log_len >= INPUT_LOG_LEN) {
             LOG_ERROR("Outgrew input log (%d bytes)!", game->input_log_len);
-        } else {
-            // Order matters: the game logic consistently prefers L > R > U > D
-            game->input_log[game->input_log_len++] =
-                    input->left ? 'L' :
-                    input->right ? 'R' :
-                    input->up ? 'U' :'D';
         }
-    } else {
-        game->ticks_without_input++;
+
+        game->last_input = game_input;
+        game->ticks_since_input_started = 1;
     }
 
     // Process the game field
@@ -566,6 +597,10 @@ enum game_state game_update(struct game *game, struct directional_input *input) 
     }
 
     return GAME_STATE_IN_PROGRESS;
+}
+
+TEST("[game] update") {
+
 }
 
 char const *game_state_to_str(enum game_state game_state) {
